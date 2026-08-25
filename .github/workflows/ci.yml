@@ -67,3 +67,7 @@ jobs:
           test -s packaging/flatpak/io.github.stranmor.MediaStudio.desktop
           test -x packaging/flatpak/host-tool-wrapper
           grep -F 'for tool in ffmpeg ffprobe magick systemd-run systemctl kbuildsycoca6 kbuildsycoca5 zenity kdialog; do ln -s media-studio-host-tool /app/bin/$tool; done' packaging/flatpak/io.github.stranmor.MediaStudio.yml
+          git cat-file -e 63dc708153b76ab7f7527579f103ce24ac106872:Cargo.toml
+          git show 63dc708153b76ab7f7527579f103ce24ac106872:Cargo.toml | grep -F 'version = "0.2.1"'
+          git cat-file -e 63dc708153b76ab7f7527579f103ce24ac106872:packaging/flatpak/host-tool-wrapper
+          git cat-file -e 63dc708153b76ab7f7527579f103ce24ac106872:packaging/flatpak/io.github.stranmor.MediaStudio.desktop
