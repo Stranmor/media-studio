@@ -24,7 +24,7 @@ jobs:
       - name: Install KDE and media dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install --yes dbus-x11 dolphin ffmpeg imagemagick kio-extras xvfb zenity
+          sudo apt-get install --yes dbus-x11 dolphin ffmpeg imagemagick kio-extras kservice xvfb zenity
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo build --release
       - name: Verify installed Dolphin consumer and conversion
