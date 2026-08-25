@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "generation": "2026-08-25T04:03:24Z",
+  "candidate": "media-studio-v0.2.1",
+  "candidate_digest": "d4c6c7afcb5807af93f6565bcef4e6718824219a87f5ae65a042b0eb03517092",
+  "contract": "Implement v0.2.1 with capability-aware VAAPI/NVENC profiles, Arch packaging, and experimental Flatpak host integration without regressing Dolphin, atomic output, queue, watch, or public install behavior.",
+  "acceptance_criteria": [
+    "real ffmpeg encoder and VAAPI render-node capability checks",
+    "explicit MEDIA_STUDIO_VAAPI_DEVICE/config override",
+    "observable fallback and fail-closed hardware mode",
+    "valid Arch PKGBUILD and Flatpak manifest",
+    "Rust fmt/clippy/tests/build and representative consumer proof",
+    "fresh independent stateless review bound to this digest"
+  ],
+  "source_of_truth": [
+    "Cargo.toml",
+    "src/model.rs",
+    "src/engine.rs",
+    "src/main.rs",
+    "README.md",
+    "CHANGELOG.md",
+    ".github/workflows/ci.yml",
+    "packaging/arch/PKGBUILD",
+    "packaging/flatpak/io.github.stranmor.MediaStudio.yml",
+    "packaging/flatpak/io.github.stranmor.MediaStudio.desktop"
+  ],
+  "consumer": "KDE Dolphin service menus and local user-systemd media conversion runtime",
+  "provenance": "working-tree candidate derived from public main at b73c690; no prior verdict is authoritative"
+}

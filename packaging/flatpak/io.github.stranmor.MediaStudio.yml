@@ -1,0 +1,34 @@
+app-id: io.github.stranmor.MediaStudio
+runtime: org.freedesktop.Platform
+runtime-version: master
+sdk: org.freedesktop.Sdk
+command: media-studio
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+finish-args:
+  - --share=ipc
+  - --socket=session-bus
+  - --device=dri
+  - --filesystem=home
+  - --filesystem=host
+  - --filesystem=xdg-config/media-studio:create
+  - --filesystem=xdg-config/systemd/user
+  - --filesystem=xdg-data/kio
+  - --filesystem=xdg-state/media-studio:create
+  - --talk-name=org.freedesktop.systemd1
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+modules:
+  - name: media-studio
+    buildsystem: simple
+    build-options:
+      build-args:
+        - --share=network
+    sources:
+      - type: git
+        url: https://github.com/Stranmor/media-studio.git
+        branch: main
+    build-commands:
+      - cargo build --release
+      - install -Dm755 target/release/media-studio /app/bin/media-studio
+      - install -Dm644 packaging/flatpak/io.github.stranmor.MediaStudio.desktop /app/share/applications/io.github.stranmor.MediaStudio.desktop

@@ -10,7 +10,7 @@ Media Studio — локальный конвертер медиа для KDE Dol
 - профили видео, аудио, изображений и remux;
 - сжатие видео до заданного размера;
 - расширенная форма с выбором профиля, размера, overwrite и fallback;
-- VAAPI и NVENC с capability-check и software fallback;
+- VAAPI и NVENC с проверкой реального FFmpeg encoder/device и software fallback;
 - watch-folders с отдельным каталогом назначения;
 - безопасно зарезервированные временные файлы, atomic commit, `ffprobe` и полная decode-проверка;
 - логи и статусы jobs в `~/.local/state/media-studio/jobs/`.
@@ -53,7 +53,9 @@ curl --fail --location https://raw.githubusercontent.com/Stranmor/media-studio/m
 
 Для `.ogx` и других Ogg-файлов menu учитывает MIME `application/ogg` и `audio/ogg`.
 
-Для Debian/Ubuntu, Fedora/RHEL и Arch доступны binary assets в GitHub Release; пакет устанавливает бинарник в `/usr/bin`, после чего выполните `media-studio install` для пользовательского Dolphin-меню.
+Для Debian/Ubuntu и Fedora/RHEL доступны binary assets в GitHub Release. Для Arch есть `packaging/arch/PKGBUILD`; после установки пакета выполните `media-studio install` для пользовательского Dolphin-меню.
+
+Экспериментальный Flatpak host-integration manifest находится в `packaging/flatpak/`: он сохраняет доступ к локальным media tools и user-systemd, поэтому не является sandboxed replacement для обычной Arch/Debian установки.
 
 ## CLI
 
@@ -97,9 +99,11 @@ media-studio watch remove --id camera
 
 ## Аппаратные профили
 
-- `video_mp4_vaapi` — VAAPI через `/dev/dri/renderD128`;
-- `video_mp4_nvenc` — NVIDIA NVENC;
-- при недоступном или неисправном hardware encoder используется software-профиль, а fallback фиксируется в job log;
+- `video_mp4_vaapi` — VAAPI с автоматическим поиском `/dev/dri/renderD*`;
+- `video_mp4_nvenc` — NVIDIA NVENC при наличии `h264_nvenc` в текущем FFmpeg;
+- `media-studio doctor` показывает эффективные `vaapi`/`nvenc` capabilities;
+- устройство VAAPI можно задать через `MEDIA_STUDIO_VAAPI_DEVICE` или `vaapi_device` в `config.toml`;
+- при недоступном или неисправном hardware encoder используется software-профиль, а причина fallback фиксируется в job log;
 - fail-closed можно включить в `config.toml`, установив `hardware_fallback = false`.
 
 ## Удаление

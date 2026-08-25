@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Media Studio Doctor
+Comment=Проверка локальной интеграции Media Studio
+Exec=media-studio doctor
+Terminal=true
+NoDisplay=true
+Categories=AudioVideo;Utility;

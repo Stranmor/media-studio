@@ -50,3 +50,17 @@ jobs:
           dolphin_exit=$?
           set -e
           test "$dolphin_exit" -eq 0 -o "$dolphin_exit" -eq 124
+
+  packaging:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Validate packaging manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n packaging/arch/PKGBUILD
+          ruby -e 'require "yaml"; manifest = YAML.load_file("packaging/flatpak/io.github.stranmor.MediaStudio.yml"); abort "bad app id" unless manifest["app-id"] == "io.github.stranmor.MediaStudio"; abort "missing main branch" unless manifest.dig("modules", 0, "sources", 0, "branch") == "main"'
+          cargo metadata --no-deps --format-version 1 >/dev/null
+          test -s packaging/flatpak/io.github.stranmor.MediaStudio.desktop

@@ -786,6 +786,9 @@ fn doctor() -> Result<()> {
             None => println!("{tool}: OPTIONAL-MISSING"),
         }
     }
+    for line in engine::hardware_diagnostics(&config) {
+        println!("{line}");
+    }
     println!("binary: {}", paths::installed_binary_path().display());
     println!(
         "service_menus: {}",

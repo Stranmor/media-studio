@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.1] - 2026-08-25
+
+### Added
+
+- Capability-aware VAAPI/NVENC selection with automatic VAAPI render-node discovery.
+- `MEDIA_STUDIO_VAAPI_DEVICE` and `vaapi_device` configuration override.
+- Arch `media-studio-git` PKGBUILD and experimental host-integration Flatpak manifest.
+
+### Changed
+
+- `media-studio doctor` reports effective VAAPI/NVENC availability and selected device.
+- Hardware profiles fail over only after encoder/device capability checks and log the exact reason.
+
 ## 0.1.0 — 2026-08-25
 
 - initial public release;

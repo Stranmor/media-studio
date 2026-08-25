@@ -15,6 +15,8 @@ pub struct Config {
     #[serde(default = "default_true")]
     pub hardware_fallback: bool,
     #[serde(default)]
+    pub vaapi_device: Option<String>,
+    #[serde(default)]
     pub profiles: BTreeMap<String, Profile>,
     #[serde(default)]
     pub watch_folders: Vec<WatchFolder>,
@@ -304,7 +306,7 @@ impl Config {
                 "-sn",
                 "-dn",
                 "-vaapi_device",
-                "/dev/dri/renderD128",
+                "{vaapi_device}",
                 "-vf",
                 "format=nv12,hwupload",
                 "-c:v",
@@ -511,6 +513,7 @@ impl Config {
             verify_results: true,
             ffmpeg_threads: 4,
             hardware_fallback: true,
+            vaapi_device: None,
             profiles,
             watch_folders: Vec::new(),
         }
@@ -547,6 +550,9 @@ impl Config {
             self.profiles.entry(id).or_insert(profile);
         }
         self.hardware_fallback = true;
+        if self.vaapi_device.is_none() {
+            self.vaapi_device = defaults.vaapi_device;
+        }
         self.schema = CURRENT_SCHEMA;
     }
 
@@ -565,6 +571,12 @@ impl Config {
             "default_profile не найден: {}",
             self.default_profile
         );
+        if let Some(device) = &self.vaapi_device {
+            anyhow::ensure!(
+                Path::new(device).is_absolute(),
+                "vaapi_device должен быть абсолютным путём: {device}"
+            );
+        }
         for (id, profile) in &self.profiles {
             anyhow::ensure!(!id.trim().is_empty(), "пустой идентификатор профиля");
             anyhow::ensure!(
@@ -660,6 +672,10 @@ mod tests {
             config.profiles["video_mp4_nvenc"].hardware,
             Some(HardwareBackend::Nvenc)
         ));
+        assert!(config.profiles["video_mp4_vaapi"]
+            .args
+            .windows(2)
+            .any(|pair| pair == ["-vaapi_device", "{vaapi_device}"]));
     }
 
     #[test]

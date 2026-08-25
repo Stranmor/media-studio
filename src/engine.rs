@@ -225,9 +225,14 @@ fn select_hardware_args(
     let Some(backend) = profile.hardware.as_ref() else {
         return Ok(args);
     };
-    if hardware_available(backend) {
-        writeln!(log, "HARDWARE={} selected", backend.label())?;
-        return Ok(args);
+    if let Some(device) = hardware_device(config, backend) {
+        let selected = if matches!(backend, HardwareBackend::Vaapi) {
+            replace_placeholder(&args, "{vaapi_device}", &device)
+        } else {
+            args
+        };
+        writeln!(log, "HARDWARE={} selected DEVICE={device}", backend.label())?;
+        return Ok(selected);
     }
     if config.hardware_fallback && !profile.fallback_args.is_empty() {
         writeln!(
@@ -241,7 +246,10 @@ fn select_hardware_args(
             profile.fallback_args.clone()
         });
     }
-    bail!("аппаратный профиль {} недоступен", backend.label())
+    bail!(
+        "аппаратный профиль {} недоступен: проверьте encoder и устройство; включите hardware_fallback или исправьте конфигурацию",
+        backend.label()
+    )
 }
 
 fn preserve_rate_flags(base: &[String], requested: &[String]) -> Vec<String> {
@@ -257,22 +265,104 @@ fn preserve_rate_flags(base: &[String], requested: &[String]) -> Vec<String> {
     output
 }
 
-fn hardware_available(backend: &HardwareBackend) -> bool {
+fn hardware_device(config: &Config, backend: &HardwareBackend) -> Option<String> {
     match backend {
-        HardwareBackend::Vaapi => fs::metadata("/dev/dri/renderD128")
-            .map(|meta| meta.file_type().is_char_device())
-            .unwrap_or(false),
-        HardwareBackend::Nvenc => runtime::required("ffmpeg")
-            .ok()
-            .and_then(|ffmpeg| {
-                Command::new(ffmpeg)
-                    .args(["-hide_banner", "-encoders"])
-                    .output()
-                    .ok()
-            })
-            .map(|output| String::from_utf8_lossy(&output.stdout).contains("h264_nvenc"))
-            .unwrap_or(false),
+        HardwareBackend::Vaapi => {
+            let device = std::env::var_os("MEDIA_STUDIO_VAAPI_DEVICE")
+                .map(PathBuf::from)
+                .or_else(|| config.vaapi_device.clone().map(PathBuf::from))
+                .or_else(discover_vaapi_device)?;
+            if !is_render_node(&device) || !ffmpeg_encoder_available("h264_vaapi") {
+                return None;
+            }
+            Some(device.display().to_string())
+        }
+        HardwareBackend::Nvenc => {
+            ffmpeg_encoder_available("h264_nvenc").then(|| "nvidia:nvenc".to_string())
+        }
     }
+}
+
+pub fn hardware_diagnostics(config: &Config) -> Vec<String> {
+    let vaapi_device = std::env::var_os("MEDIA_STUDIO_VAAPI_DEVICE")
+        .map(PathBuf::from)
+        .or_else(|| config.vaapi_device.clone().map(PathBuf::from))
+        .or_else(discover_vaapi_device);
+    let vaapi = match vaapi_device {
+        Some(device) if is_render_node(&device) && ffmpeg_encoder_available("h264_vaapi") => {
+            format!("vaapi: OK ({})", device.display())
+        }
+        Some(device) => format!(
+            "vaapi: MISSING (device or h264_vaapi unavailable: {})",
+            device.display()
+        ),
+        None => "vaapi: MISSING (render node or h264_vaapi unavailable)".to_string(),
+    };
+    let nvenc = if ffmpeg_encoder_available("h264_nvenc") {
+        "nvenc: OK (h264_nvenc)".to_string()
+    } else {
+        "nvenc: MISSING (h264_nvenc unavailable)".to_string()
+    };
+    vec![vaapi, nvenc]
+}
+
+fn discover_vaapi_device() -> Option<PathBuf> {
+    let mut devices = fs::read_dir("/dev/dri")
+        .ok()?
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .map(|name| name.starts_with("renderD"))
+                .unwrap_or(false)
+        })
+        .filter(|path| is_render_node(path))
+        .collect::<Vec<_>>();
+    devices.sort();
+    devices.into_iter().next()
+}
+
+fn is_render_node(path: &Path) -> bool {
+    fs::metadata(path)
+        .map(|meta| meta.file_type().is_char_device())
+        .unwrap_or(false)
+}
+
+fn ffmpeg_encoder_available(encoder: &str) -> bool {
+    let Some(ffmpeg) = runtime::optional("ffmpeg") else {
+        return false;
+    };
+    let Ok(output) = Command::new(ffmpeg)
+        .args(["-hide_banner", "-encoders"])
+        .output()
+    else {
+        return false;
+    };
+    let listing = format!(
+        "{}\n{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    parse_encoder_listing(&listing, encoder)
+}
+
+fn parse_encoder_listing(listing: &str, encoder: &str) -> bool {
+    listing
+        .lines()
+        .any(|line| line.split_whitespace().any(|token| token == encoder))
+}
+
+fn replace_placeholder(args: &[String], placeholder: &str, value: &str) -> Vec<String> {
+    args.iter()
+        .map(|arg| {
+            if arg == placeholder {
+                value.to_string()
+            } else {
+                arg.clone()
+            }
+        })
+        .collect()
 }
 
 fn invoke_ffmpeg(
@@ -503,4 +593,29 @@ pub fn ensure_tools(profile: Option<&Profile>) -> Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn encoder_listing_requires_exact_encoder_token() {
+        let listing = " V..... h264_vaapi           H.264/AVC (VAAPI)\n V..... h264_nvenc           NVIDIA NVENC H.264 encoder";
+        assert!(parse_encoder_listing(listing, "h264_vaapi"));
+        assert!(parse_encoder_listing(listing, "h264_nvenc"));
+        assert!(!parse_encoder_listing(listing, "h264"));
+    }
+
+    #[test]
+    fn placeholder_replacement_is_exact() {
+        let args = vec![
+            "-vaapi_device".to_string(),
+            "{vaapi_device}".to_string(),
+            "{vaapi_device}-suffix".to_string(),
+        ];
+        let replaced = replace_placeholder(&args, "{vaapi_device}", "/dev/dri/renderD129");
+        assert_eq!(replaced[1], "/dev/dri/renderD129");
+        assert_eq!(replaced[2], "{vaapi_device}-suffix");
+    }
 }
