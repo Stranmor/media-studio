@@ -18,7 +18,7 @@ jobs:
             runner: ubuntu-24.04-arm
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@latest
+      - uses: actions/checkout@main
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo build --release
       - name: Build binary and distro packages
@@ -39,7 +39,7 @@ jobs:
           tar -czf "release-assets/${binary}.tar.gz" -C release-assets/stage "$binary"
           (cd release-assets/stage && sha256sum "${binary}") > "release-assets/${binary}.sha256"
           cp "release-assets/stage/${binary}" release-assets/
-      - uses: actions/upload-artifact@latest
+      - uses: actions/upload-artifact@main
         with:
           name: media-studio-${{ matrix.arch }}
           path: release-assets/*
@@ -48,10 +48,10 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@latest
+      - uses: actions/download-artifact@main
         with:
           path: release-assets
           merge-multiple: true
-      - uses: softprops/action-gh-release@latest
+      - uses: softprops/action-gh-release@master
         with:
           files: release-assets/*
