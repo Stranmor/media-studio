@@ -14,7 +14,7 @@ finish-args:
   - --filesystem=xdg-config/media-studio:create
   - --filesystem=xdg-config/systemd/user
   - --filesystem=xdg-data/kio
-  - --filesystem=xdg-state/media-studio:create
+  - --filesystem=xdg-state
   - --talk-name=org.freedesktop.systemd1
   - --talk-name=org.freedesktop.Flatpak
 build-options:
