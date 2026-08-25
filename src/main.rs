@@ -999,19 +999,20 @@ fn uninstall(purge: bool) -> Result<()> {
     }
 }
 
+const LEGACY_MENU_NAMES: &[&str] = &[
+    "media-studio.desktop",
+    "compress-video-max-400mb.desktop",
+    "compress-video-to-400mb.desktop",
+    "compress-video-to-custom-size.desktop",
+    "video-tools.desktop",
+    "convert-audio-to-opus.desktop",
+];
+
 fn hide_legacy_menus() -> Result<()> {
-    let legacy = [
-        "media-studio.desktop",
-        "compress-video-max-400mb.desktop",
-        "compress-video-to-400mb.desktop",
-        "compress-video-to-custom-size.desktop",
-        "video-tools.desktop",
-        "convert-audio-to-opus.desktop",
-    ];
     let source_dir = paths::service_menu_dir();
     let disabled_dir = source_dir.join("disabled");
     fs::create_dir_all(&disabled_dir)?;
-    for name in legacy {
+    for name in LEGACY_MENU_NAMES {
         let source = source_dir.join(name);
         if source.is_file() {
             let target = disabled_dir.join(name);
@@ -1364,5 +1365,10 @@ mod tests {
         assert!(!effective_hardware_fallback(&config, None));
         assert!(effective_hardware_fallback(&config, Some(true)));
         assert!(!effective_hardware_fallback(&config, Some(false)));
+    }
+
+    #[test]
+    fn legacy_media_studio_menu_is_migrated_for_restore() {
+        assert!(LEGACY_MENU_NAMES.contains(&"media-studio.desktop"));
     }
 }
