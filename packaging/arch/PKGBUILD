@@ -1,4 +1,4 @@
-pkgname=media-studio-git
+pkgname=media-studio
 pkgver=0.2.1
 pkgrel=1
 pkgdesc='Dolphin-integrated local media conversion studio'
@@ -14,11 +14,6 @@ optdepends=(
 )
 source=('git+https://github.com/Stranmor/media-studio.git#commit=63dc708153b76ab7f7527579f103ce24ac106872')
 sha256sums=('SKIP')
-
-pkgver() {
-  cd "$srcdir/media-studio"
-  printf '0.2.1.r%s.g%s\n' "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
-}
 
 build() {
   cd "$srcdir/media-studio"

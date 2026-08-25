@@ -61,10 +61,9 @@ jobs:
         run: |
           set -euo pipefail
           bash -n packaging/arch/PKGBUILD
+          (cd packaging/arch && makepkg --packagelist | grep -F 'media-studio-0.2.1-1-')
           ruby -e 'require "yaml"; manifest = YAML.load_file("packaging/flatpak/io.github.stranmor.MediaStudio.yml"); abort "bad app id" unless manifest["app-id"] == "io.github.stranmor.MediaStudio"; abort "missing candidate commit" unless manifest.dig("modules", 0, "sources", 0, "commit") == "63dc708153b76ab7f7527579f103ce24ac106872"'
           cargo metadata --no-deps --format-version 1 >/dev/null
           test -s packaging/flatpak/io.github.stranmor.MediaStudio.desktop
           test -x packaging/flatpak/host-tool-wrapper
-          for tool in ffmpeg ffprobe magick systemd-run systemctl kbuildsycoca6 kbuildsycoca5 zenity kdialog; do
-            grep -F "ln -s media-studio-host-tool /app/bin/$tool" packaging/flatpak/io.github.stranmor.MediaStudio.yml
-          done
+          grep -F 'for tool in ffmpeg ffprobe magick systemd-run systemctl kbuildsycoca6 kbuildsycoca5 zenity kdialog; do ln -s media-studio-host-tool /app/bin/$tool; done' packaging/flatpak/io.github.stranmor.MediaStudio.yml

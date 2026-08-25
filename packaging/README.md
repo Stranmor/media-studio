@@ -2,7 +2,7 @@
 
 ## Arch Linux
 
-`packaging/arch/PKGBUILD` is pinned to the reviewed `v0.2.1` candidate commit and builds `media-studio-git` with Arch's Rust toolchain. The package installs only the binary and documentation; run `media-studio install` as the user who owns the Dolphin session.
+`packaging/arch/PKGBUILD` is pinned to the reviewed `v0.2.1` candidate commit and builds the stable `media-studio` package with Arch's Rust toolchain. The package installs only the binary and documentation; run `media-studio install` as the user who owns the Dolphin session.
 
 ## Flatpak
 

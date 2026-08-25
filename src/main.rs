@@ -855,10 +855,6 @@ fn install(force_config: bool) -> Result<()> {
         fs::write(menu_path, menu)?;
         fs::set_permissions(menu_path, fs::Permissions::from_mode(0o755))?;
     }
-    let legacy_menu = paths::legacy_service_menu_path();
-    if legacy_menu.is_file() {
-        fs::remove_file(&legacy_menu)?;
-    }
     hide_legacy_menus()?;
     for folder in &config.watch_folders {
         if folder.enabled {
@@ -1005,6 +1001,7 @@ fn uninstall(purge: bool) -> Result<()> {
 
 fn hide_legacy_menus() -> Result<()> {
     let legacy = [
+        "media-studio.desktop",
         "compress-video-max-400mb.desktop",
         "compress-video-to-400mb.desktop",
         "compress-video-to-custom-size.desktop",
