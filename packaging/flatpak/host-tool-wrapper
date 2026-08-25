@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+
+tool=${0##*/}
+flatpak_spawn=$(command -v flatpak-spawn || true)
+if [ -z "$flatpak_spawn" ]; then
+    printf '%s\n' "Media Studio Flatpak requires flatpak-spawn for host tool integration" >&2
+    exit 127
+fi
+exec "$flatpak_spawn" --host "$tool" "$@"

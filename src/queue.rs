@@ -6,16 +6,19 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use crate::runtime;
 use crate::{paths, ui};
 
-pub fn enqueue(
-    executable: &Path,
-    profile: &str,
-    target_size_mb: Option<u64>,
-    hardware_fallback: bool,
-    output_dir: Option<std::path::PathBuf>,
-    overwrite: bool,
-    files: &[String],
-) -> Result<String> {
-    if files.is_empty() {
+pub struct EnqueueRequest<'a> {
+    pub executable: &'a Path,
+    pub profile: &'a str,
+    pub target_size_mb: Option<u64>,
+    pub hardware_fallback: bool,
+    pub vaapi_device: Option<&'a str>,
+    pub output_dir: Option<std::path::PathBuf>,
+    pub overwrite: bool,
+    pub files: &'a [String],
+}
+
+pub fn enqueue(request: EnqueueRequest<'_>) -> Result<String> {
+    if request.files.is_empty() {
         bail!("в Dolphin ничего не выбрано. Выберите хотя бы один медиафайл.");
     }
     let job_id = new_job_id();
@@ -34,33 +37,36 @@ pub fn enqueue(
             "--no-block",
             "--quiet",
         ])
-        .arg(executable)
+        .args(vaapi_environment_arg(request.vaapi_device))
+        .arg(request.executable)
         .args([
             "run",
             "--job-id",
             &job_id,
             "--profile",
-            profile,
+            request.profile,
             "--hardware-fallback",
-            &hardware_fallback.to_string(),
+            &request.hardware_fallback.to_string(),
         ])
         .args(
-            target_size_mb
+            request
+                .target_size_mb
                 .map(|value| vec!["--target-size-mb".to_string(), value.to_string()])
                 .unwrap_or_default(),
         )
         .args(
-            output_dir
+            request
+                .output_dir
                 .map(|value| vec!["--output-dir".to_string(), value.display().to_string()])
                 .unwrap_or_default(),
         )
-        .args(if overwrite {
+        .args(if request.overwrite {
             vec!["--overwrite".to_string()]
         } else {
             Vec::new()
         })
         .arg("--")
-        .args(files)
+        .args(request.files)
         .stdout(Stdio::null())
         .stderr(Stdio::piped());
     let output = command
@@ -74,7 +80,7 @@ pub fn enqueue(
         "Media Studio",
         &format!(
             "Задача {job_id} добавлена в очередь: {} файл(ов)",
-            files.len()
+            request.files.len()
         ),
     );
     Ok(job_id)
@@ -97,7 +103,11 @@ pub fn list() -> Result<String> {
             String::from_utf8_lossy(&output.stderr).trim()
         );
     }
-    let text = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let text = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter(|line| is_conversion_unit(line.split_whitespace().next().unwrap_or_default()))
+        .collect::<Vec<_>>()
+        .join("\n");
     Ok(if text.is_empty() {
         "Очередь Media Studio пуста.".to_string()
     } else {
@@ -110,6 +120,10 @@ pub fn cancel(job_id: &str) -> Result<()> {
     let normalized = normalized
         .strip_prefix("media-studio-")
         .unwrap_or(normalized);
+    anyhow::ensure!(
+        !normalized.starts_with("watch-"),
+        "watch-folder unit нельзя отменить через queue; используйте `media-studio watch stop --id ID`"
+    );
     anyhow::ensure!(
         paths::valid_job_id(normalized),
         "некорректный идентификатор задачи"
@@ -135,4 +149,32 @@ fn new_job_id() -> String {
         .unwrap_or_default()
         .as_nanos();
     format!("{}-{}", nanos, std::process::id())
+}
+
+fn is_conversion_unit(unit: &str) -> bool {
+    unit.starts_with("media-studio-") && !unit.starts_with("media-studio-watch-")
+}
+
+fn vaapi_environment_arg(device: Option<&str>) -> Option<String> {
+    device.map(|device| format!("--setenv=MEDIA_STUDIO_VAAPI_DEVICE={device}"))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn queue_filter_excludes_watch_units() {
+        assert!(super::is_conversion_unit("media-studio-123-456.service"));
+        assert!(!super::is_conversion_unit(
+            "media-studio-watch-camera.service"
+        ));
+    }
+
+    #[test]
+    fn queue_vaapi_environment_argument_is_exact() {
+        assert_eq!(
+            super::vaapi_environment_arg(Some("/dev/dri/renderD128")),
+            Some("--setenv=MEDIA_STUDIO_VAAPI_DEVICE=/dev/dri/renderD128".to_string())
+        );
+        assert_eq!(super::vaapi_environment_arg(None), None);
+    }
 }

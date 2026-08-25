@@ -203,7 +203,7 @@ fn run_ffmpeg_once(
     log: &mut File,
     args: Vec<String>,
 ) -> Result<std::process::ExitStatus> {
-    let selected_args = select_hardware_args(config, profile, args, log)?;
+    let selected_args = select_hardware_args(config, profile, &args, log)?;
     let status = invoke_ffmpeg(config, input, temp, log, &selected_args)?;
     if status.success()
         || profile.hardware.is_none()
@@ -213,23 +213,28 @@ fn run_ffmpeg_once(
         return Ok(status);
     }
     writeln!(log, "HARDWARE_FALLBACK=software AFTER_STATUS={status}")?;
-    invoke_ffmpeg(config, input, temp, log, &profile.fallback_args)
+    let fallback_args = if profile.target_size_mb.is_some() {
+        preserve_rate_flags(&profile.fallback_args, &args)
+    } else {
+        profile.fallback_args.clone()
+    };
+    invoke_ffmpeg(config, input, temp, log, &fallback_args)
 }
 
 fn select_hardware_args(
     config: &Config,
     profile: &Profile,
-    args: Vec<String>,
+    args: &[String],
     log: &mut File,
 ) -> Result<Vec<String>> {
     let Some(backend) = profile.hardware.as_ref() else {
-        return Ok(args);
+        return Ok(args.to_vec());
     };
     if let Some(device) = hardware_device(config, backend) {
         let selected = if matches!(backend, HardwareBackend::Vaapi) {
-            replace_placeholder(&args, "{vaapi_device}", &device)
+            replace_placeholder(args, "{vaapi_device}", &device)
         } else {
-            args
+            args.to_vec()
         };
         writeln!(log, "HARDWARE={} selected DEVICE={device}", backend.label())?;
         return Ok(selected);
@@ -237,11 +242,11 @@ fn select_hardware_args(
     if config.hardware_fallback && !profile.fallback_args.is_empty() {
         writeln!(
             log,
-            "HARDWARE={} unavailable; using software fallback",
+            "HARDWARE_FALLBACK=software BACKEND={} REASON=capability_unavailable",
             backend.label()
         )?;
         return Ok(if profile.target_size_mb.is_some() {
-            preserve_rate_flags(&profile.fallback_args, &args)
+            preserve_rate_flags(&profile.fallback_args, args)
         } else {
             profile.fallback_args.clone()
         });
@@ -324,9 +329,15 @@ fn discover_vaapi_device() -> Option<PathBuf> {
 }
 
 fn is_render_node(path: &Path) -> bool {
-    fs::metadata(path)
-        .map(|meta| meta.file_type().is_char_device())
-        .unwrap_or(false)
+    let render_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| name.starts_with("renderD"))
+        .unwrap_or(false);
+    render_name
+        && fs::metadata(path)
+            .map(|meta| meta.file_type().is_char_device())
+            .unwrap_or(false)
 }
 
 fn ffmpeg_encoder_available(encoder: &str) -> bool {
@@ -339,12 +350,10 @@ fn ffmpeg_encoder_available(encoder: &str) -> bool {
     else {
         return false;
     };
-    let listing = format!(
-        "{}\n{}",
-        String::from_utf8_lossy(&output.stdout),
-        String::from_utf8_lossy(&output.stderr)
-    );
-    parse_encoder_listing(&listing, encoder)
+    if !output.status.success() {
+        return false;
+    }
+    parse_encoder_listing(&String::from_utf8_lossy(&output.stdout), encoder)
 }
 
 fn parse_encoder_listing(listing: &str, encoder: &str) -> bool {
@@ -617,5 +626,29 @@ mod tests {
         let replaced = replace_placeholder(&args, "{vaapi_device}", "/dev/dri/renderD129");
         assert_eq!(replaced[1], "/dev/dri/renderD129");
         assert_eq!(replaced[2], "{vaapi_device}-suffix");
+    }
+
+    #[test]
+    fn target_fallback_preserves_rate_flags() {
+        let software = vec!["-c:v".to_string(), "libx264".to_string()];
+        let requested = vec![
+            "-c:v".to_string(),
+            "h264_nvenc".to_string(),
+            "-b:v".to_string(),
+            "900k".to_string(),
+            "-maxrate".to_string(),
+            "900k".to_string(),
+            "-bufsize".to_string(),
+            "1800k".to_string(),
+            "-b:a".to_string(),
+            "128k".to_string(),
+        ];
+        let fallback = preserve_rate_flags(&software, &requested);
+        assert!(fallback.windows(2).any(|pair| pair == ["-b:v", "900k"]));
+        assert!(fallback.windows(2).any(|pair| pair == ["-maxrate", "900k"]));
+        assert!(fallback
+            .windows(2)
+            .any(|pair| pair == ["-bufsize", "1800k"]));
+        assert!(fallback.windows(2).any(|pair| pair == ["-b:a", "128k"]));
     }
 }

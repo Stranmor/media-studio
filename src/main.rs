@@ -53,8 +53,8 @@ enum Commands {
         profile: String,
         #[arg(long)]
         target_size_mb: Option<u64>,
-        #[arg(long, default_value_t = true, action = clap::ArgAction::Set)]
-        hardware_fallback: bool,
+        #[arg(long, action = clap::ArgAction::Set)]
+        hardware_fallback: Option<bool>,
         #[arg(trailing_var_arg = true)]
         files: Vec<String>,
     },
@@ -68,8 +68,8 @@ enum Commands {
         overwrite: bool,
         #[arg(long)]
         target_size_mb: Option<u64>,
-        #[arg(long, default_value_t = true, action = clap::ArgAction::Set)]
-        hardware_fallback: bool,
+        #[arg(long, action = clap::ArgAction::Set)]
+        hardware_fallback: Option<bool>,
         #[arg(long)]
         output_dir: Option<PathBuf>,
         #[arg(trailing_var_arg = true)]
@@ -184,7 +184,7 @@ fn run() -> Result<()> {
                 &config,
                 &profile,
                 target_size_mb,
-                hardware_fallback,
+                effective_hardware_fallback(&config, hardware_fallback),
                 None,
                 false,
                 files,
@@ -239,6 +239,10 @@ fn load_config() -> Result<Config> {
     Config::load(&paths::config_path())
 }
 
+fn effective_hardware_fallback(config: &Config, override_value: Option<bool>) -> bool {
+    override_value.unwrap_or(config.hardware_fallback)
+}
+
 fn enqueue_with_profile(
     config: &Config,
     profile: &str,
@@ -264,15 +268,19 @@ fn enqueue_with_profile(
     } else {
         std::env::current_exe()?
     };
-    let job_id = queue::enqueue(
-        &executable,
+    let vaapi_device = std::env::var("MEDIA_STUDIO_VAAPI_DEVICE")
+        .ok()
+        .or_else(|| config.vaapi_device.clone());
+    let job_id = queue::enqueue(queue::EnqueueRequest {
+        executable: &executable,
         profile,
         target_size_mb,
         hardware_fallback,
+        vaapi_device: vaapi_device.as_deref(),
         output_dir,
         overwrite,
-        &files,
-    )?;
+        files: &files,
+    })?;
     println!(
         "QUEUED job_id={job_id} profile={profile} files={}",
         files.len()
@@ -285,7 +293,7 @@ fn run_job(
     profile_id: &str,
     overwrite: bool,
     target_size_mb: Option<u64>,
-    hardware_fallback: bool,
+    hardware_fallback: Option<bool>,
     output_dir: Option<PathBuf>,
     raw_files: Vec<String>,
 ) -> Result<()> {
@@ -307,7 +315,7 @@ fn run_job(
         profile.target_size_mb = target_size_mb;
     }
     let mut runtime_config = config.clone();
-    runtime_config.hardware_fallback = hardware_fallback;
+    runtime_config.hardware_fallback = effective_hardware_fallback(&config, hardware_fallback);
     engine::ensure_tools(Some(&profile))?;
     let log = paths::job_log_path(job_id);
     if let Some(parent) = log.parent() {
@@ -511,6 +519,7 @@ fn run_watch_command(command: WatchCommand) -> Result<()> {
             config.validate()?;
             config.write(&paths::config_path())?;
             if let Err(error) = install_watch_unit(
+                &config,
                 config
                     .watch_folders
                     .iter()
@@ -553,7 +562,7 @@ fn run_watch_command(command: WatchCommand) -> Result<()> {
                 .with_context(|| format!("watch-folder не найден: {id}"))?;
             config.watch_folders[index].enabled = true;
             let folder = config.watch_folders[index].clone();
-            install_watch_unit(&folder)?;
+            install_watch_unit(&config, &folder)?;
             config.write(&paths::config_path())?;
             println!("WATCH_STARTED id={id}");
             Ok(())
@@ -592,14 +601,24 @@ fn ensure_watch_id(id: &str) -> Result<()> {
     Ok(())
 }
 
-fn install_watch_unit(folder: &WatchFolder) -> Result<()> {
+fn install_watch_unit(config: &Config, folder: &WatchFolder) -> Result<()> {
     let binary = paths::installed_binary_path();
     let path = paths::watch_service_path(&folder.id);
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
     let binary = systemd_quote(&binary);
-    let unit = format!("[Unit]\nDescription=Media Studio watch-folder {}\nAfter=graphical-session.target\n\n[Service]\nExecStart={} watch-run --id {}\nRestart=always\nRestartSec=4\n\n[Install]\nWantedBy=default.target\n", folder.id, binary, folder.id);
+    let vaapi_environment = std::env::var("MEDIA_STUDIO_VAAPI_DEVICE")
+        .ok()
+        .or_else(|| config.vaapi_device.clone())
+        .map(|device| {
+            format!(
+                "Environment=MEDIA_STUDIO_VAAPI_DEVICE={}\n",
+                systemd_quote(Path::new(&device))
+            )
+        })
+        .unwrap_or_default();
+    let unit = format!("[Unit]\nDescription=Media Studio watch-folder {}\nAfter=graphical-session.target\n\n[Service]\n{}ExecStart={} watch-run --id {}\nRestart=always\nRestartSec=4\n\n[Install]\nWantedBy=default.target\n", folder.id, vaapi_environment, binary, folder.id);
     paths::atomic_write(&path, unit.as_bytes())?;
     let reload = required_command("systemctl")?
         .args(["--user", "daemon-reload"])
@@ -843,7 +862,7 @@ fn install(force_config: bool) -> Result<()> {
     hide_legacy_menus()?;
     for folder in &config.watch_folders {
         if folder.enabled {
-            install_watch_unit(folder)?;
+            install_watch_unit(&config, folder)?;
         }
     }
     let cache =
@@ -1339,5 +1358,14 @@ mod tests {
         let config = Config::built_in();
         config.validate().expect("built-in config must validate");
         assert!(config.profiles.len() >= 10);
+    }
+
+    #[test]
+    fn hardware_fallback_uses_config_unless_cli_overrides_it() {
+        let mut config = Config::built_in();
+        config.hardware_fallback = false;
+        assert!(!effective_hardware_fallback(&config, None));
+        assert!(effective_hardware_fallback(&config, Some(true)));
+        assert!(!effective_hardware_fallback(&config, Some(false)));
     }
 }
