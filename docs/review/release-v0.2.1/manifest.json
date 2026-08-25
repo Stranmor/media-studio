@@ -1,29 +1,37 @@
 {
   "schema_version": 1,
-  "generation": "2026-08-25T04:03:24Z",
+  "generation": "2026-08-25T07:42:00Z",
   "candidate": "media-studio-v0.2.1",
-  "candidate_digest": "d4c6c7afcb5807af93f6565bcef4e6718824219a87f5ae65a042b0eb03517092",
-  "contract": "Implement v0.2.1 with capability-aware VAAPI/NVENC profiles, Arch packaging, and experimental Flatpak host integration without regressing Dolphin, atomic output, queue, watch, or public install behavior.",
+  "candidate_digest": "4b44fce7c1001760b2c57b386476f6532981b6df",
+  "digest_method": "canonical candidate git commit SHA; packaging sources are pinned to implementation commit 63dc708153b76ab7f7527579f103ce24ac106872",
+  "contract": "Implement v0.2.1 with capability-aware VAAPI/NVENC profiles, Arch packaging, and an explicitly experimental Flatpak host-integration manifest without regressing Dolphin, atomic output, queue, watch, or public install behavior.",
   "acceptance_criteria": [
     "real ffmpeg encoder and VAAPI render-node capability checks",
     "explicit MEDIA_STUDIO_VAAPI_DEVICE/config override",
     "observable fallback and fail-closed hardware mode",
-    "valid Arch PKGBUILD and Flatpak manifest",
+    "valid Arch PKGBUILD and explicit, wrapper-backed experimental Flatpak manifest; Flatpak build/runtime readiness is not claimed",
     "Rust fmt/clippy/tests/build and representative consumer proof",
-    "fresh independent stateless review bound to this digest"
+    "fresh independent stateless review bound to this digest",
+    "execution evidence includes Rust tests, clippy, release build, VAAPI success, NVENC runtime fallback, queue/watch propagation, Arch archive package validation, and packaging manifest validation"
   ],
   "source_of_truth": [
     "Cargo.toml",
     "src/model.rs",
     "src/engine.rs",
     "src/main.rs",
+    "src/queue.rs",
     "README.md",
     "CHANGELOG.md",
     ".github/workflows/ci.yml",
     "packaging/arch/PKGBUILD",
     "packaging/flatpak/io.github.stranmor.MediaStudio.yml",
-    "packaging/flatpak/io.github.stranmor.MediaStudio.desktop"
+    "packaging/flatpak/io.github.stranmor.MediaStudio.desktop",
+    "packaging/flatpak/host-tool-wrapper",
+    "packaging/flatpak/host-tool-wrapper",
+    "src/runtime.rs",
+    "install.sh",
+    "LICENSE"
   ],
   "consumer": "KDE Dolphin service menus and local user-systemd media conversion runtime",
-  "provenance": "working-tree candidate derived from public main at b73c690; no prior verdict is authoritative"
+  "provenance": "candidate content derived from public main at b73c690, implementation commit 63dc708, packaging-pin commit 7e9f5b0, legacy-menu migration commit e235918, and pinned-source CI commit 4b44fce; previous REVISE verdicts are retained as history and are not treated as proof"
 }

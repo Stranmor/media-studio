@@ -1,0 +1,3994 @@
+# Stateless release review
+
+Review only the current Media Studio v0.2.1 candidate and the bounded manifest supplied with it.
+
+This is the pre-publicization gate. The candidate is intentionally reviewed before the authorized `main` push and `v0.2.1` tag; absence of a pushed tag is expected and is not a defect when all local source and consumer checks pass.
+
+Verdict must be one of `positive`, `negative`, `pending`, `failed`, or `unknown`.
+
+Acceptance criteria:
+
+1. VAAPI and NVENC profiles must check the actual FFmpeg encoder capability; VAAPI must resolve a real render node and support an explicit override; software fallback must remain fail-closed when disabled and be observable when enabled.
+2. Arch packaging must be buildable from the candidate source. The Flatpak manifest is an explicitly experimental, non-release host-integration artifact: validate its syntax, v0.2.1 source, explicit host-tool wrappers, and limitation statement, but do not require a flatpak-builder runtime claim when that builder is unavailable in the bounded environment.
+3. Existing Dolphin MIME menus, atomic output commits, and queue/watch behavior must not regress. Public installer and release-asset readback are a post-push gate, not a pre-publicization requirement.
+4. The candidate must pass its Rust tests, formatting, clippy, packaging validation, and representative consumer checks before a positive verdict; unverified Flatpak runtime behavior must remain outside the release claim.
+
+Return material defects first, then bounded risks and a concise verdict.
+
+# Exact claim under review
+
+Media Studio v0.2.1 candidate commit 7e9f5b0df63385474a25b330bdc50bf5c8d5cace is ready for native Arch/Dolphin/user-systemd release: VAAPI/NVENC capability checks are fail-closed and observable, config and environment fallback policy is honored through queue and watch units, target-size fallback preserves rate controls, atomic output and existing menus are retained, and packaging is bounded to a buildable Arch package plus an explicitly experimental wrapper-backed Flatpak manifest. This is a pre-publicization review; the v0.2.1 tag is intentionally not pushed yet.
+
+# Exact bound sources
+
+--- BEGIN docs/review/release-v0.2.1/manifest.json (full file) ---
+{
+  "schema_version": 1,
+  "generation": "2026-08-25T07:42:00Z",
+  "candidate": "media-studio-v0.2.1",
+  "candidate_digest": "7e9f5b0df63385474a25b330bdc50bf5c8d5cace",
+  "digest_method": "canonical candidate git commit SHA; packaging sources are pinned to implementation commit 63dc708153b76ab7f7527579f103ce24ac106872",
+  "contract": "Implement v0.2.1 with capability-aware VAAPI/NVENC profiles, Arch packaging, and an explicitly experimental Flatpak host-integration manifest without regressing Dolphin, atomic output, queue, watch, or public install behavior.",
+  "acceptance_criteria": [
+    "real ffmpeg encoder and VAAPI render-node capability checks",
+    "explicit MEDIA_STUDIO_VAAPI_DEVICE/config override",
+    "observable fallback and fail-closed hardware mode",
+    "valid Arch PKGBUILD and explicit, wrapper-backed experimental Flatpak manifest; Flatpak build/runtime readiness is not claimed",
+    "Rust fmt/clippy/tests/build and representative consumer proof",
+    "fresh independent stateless review bound to this digest",
+    "execution evidence includes Rust tests, clippy, release build, VAAPI success, NVENC runtime fallback, queue/watch propagation, Arch archive package validation, and packaging manifest validation"
+  ],
+  "source_of_truth": [
+    "Cargo.toml",
+    "src/model.rs",
+    "src/engine.rs",
+    "src/main.rs",
+    "src/queue.rs",
+    "README.md",
+    "CHANGELOG.md",
+    ".github/workflows/ci.yml",
+    "packaging/arch/PKGBUILD",
+    "packaging/flatpak/io.github.stranmor.MediaStudio.yml",
+    "packaging/flatpak/io.github.stranmor.MediaStudio.desktop",
+    "packaging/flatpak/host-tool-wrapper",
+    "packaging/flatpak/host-tool-wrapper",
+    "src/runtime.rs",
+    "install.sh",
+    "LICENSE"
+  ],
+  "consumer": "KDE Dolphin service menus and local user-systemd media conversion runtime",
+  "provenance": "candidate content derived from public main at b73c690, implementation commit 63dc708, and packaging-pin commit 7e9f5b0; previous REVISE verdicts are retained as history and are not treated as proof"
+}
+
+--- END docs/review/release-v0.2.1/manifest.json ---
+[bound full-file sha256: bc277a4a43d804c21951babe3a2343d6f904b9723e5979ee605e2a4aecb52f03]
+
+--- BEGIN docs/review/release-v0.2.1/evidence.md (full file) ---
+# Candidate evidence
+
+Evidence is bounded to candidate commit `7e9f5b0df63385474a25b330bdc50bf5c8d5cace`; package sources resolve implementation commit `63dc708153b76ab7f7527579f103ce24ac106872`.
+
+- Rust formatting passed with isolated rustfmt configuration.
+- `cargo test --all-targets`: 13 passed, 0 failed.
+- `cargo clippy --all-targets -- -D warnings`: passed.
+- `cargo build --release`: passed for `media-studio 0.2.1`.
+- VAAPI consumer run: `HARDWARE=VAAPI selected DEVICE=/dev/dri/renderD128`, output committed, `RESULT=verified`.
+- NVENC consumer run: capability selected, runtime returned exit status 255, `HARDWARE_FALLBACK=software AFTER_STATUS=...`, output committed, `RESULT=verified`.
+- Invalid VAAPI override `/dev/null`: doctor reports `vaapi: MISSING` and does not accept the non-render node.
+- Disabled fallback: `hardware_fallback=false` exits nonzero after NVENC failure and emits no software fallback marker.
+- Target-size hardware fallback: NVENC runtime failure falls back to libx264 while preserving `-b:v`, `-maxrate`, `-bufsize`, and `-b:a` rate flags; output completed and status is `completed`.
+- Queue propagation: fake `systemd-run` captured `--setenv=MEDIA_STUDIO_VAAPI_DEVICE=/dev/dri/renderD128`.
+- Watch propagation: generated user unit contains `Environment=MEDIA_STUDIO_VAAPI_DEVICE="/dev/dri/renderD128"` before `ExecStart`.
+- Arch packaging: `makepkg --packagelist` parses the project PKGBUILD; archive-based `makepkg --nodeps --clean --force` produced `media-studio-proof-0.2.1-1-x86_64.pkg.tar.zst`; `pacman -Qip` confirms version 0.2.1-1 and dependencies `ffmpeg kio systemd`.
+- Flatpak: YAML/app-id/source-commit validation, wrapper shell validation, and explicit `flatpak-spawn --host` wrapper contract passed. `flatpak-builder` is unavailable locally, so Flatpak runtime/build readiness remains explicitly unclaimed.
+- Public `v0.2.0` remains the last published consumer; v0.2.1 is not pushed until the fresh review is positive.
+
+--- END docs/review/release-v0.2.1/evidence.md ---
+[bound full-file sha256: 3a5ff901a0efe7a41eddd709e90b429d345bc1e91ae9b7d5e648168275af6500]
+
+--- BEGIN Cargo.toml (full file) ---
+[package]
+name = "media-studio"
+version = "0.2.1"
+edition = "2021"
+description = "Dolphin-integrated media conversion studio"
+authors = ["Ivan Plankin"]
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/Stranmor/media-studio"
+keywords = ["dolphin", "kde", "ffmpeg", "media", "converter"]
+categories = ["command-line-utilities", "multimedia"]
+
+[dependencies]
+anyhow = "*"
+clap = { version = "*", features = ["derive"] }
+serde = { version = "*", features = ["derive"] }
+serde_json = "*"
+toml = "*"
+tempfile = "*"
+which = "*"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true
+
+[package.metadata.deb]
+maintainer = "Ivan Plankin"
+copyright = "2026 Ivan Plankin"
+section = "utils"
+priority = "optional"
+assets = [["target/release/media-studio", "usr/bin/media-studio", "755"]]
+
+[package.metadata.generate-rpm]
+assets = [{ source = "target/release/media-studio", dest = "/usr/bin/media-studio", mode = "0755" }]
+
+--- END Cargo.toml ---
+[bound full-file sha256: dcccaf881dc1d5ba74634dd9270bf065f700cc584b00c0a56da9b81685260fd0]
+
+--- BEGIN README.md (full file) ---
+# Media Studio
+
+Media Studio — локальный конвертер медиа для KDE Dolphin. Выберите файлы в Dolphin, откройте `Media Studio` и поставьте conversion job в user-systemd очередь.
+
+Проект рассчитан на Linux + KDE Plasma 6. Пользовательские данные остаются локальными: Media Studio запускает `ffmpeg`, `ffprobe`, ImageMagick и user-systemd от имени текущего пользователя.
+
+## Что решает проект
+
+- отдельные контекстные меню Dolphin для видео, аудио и изображений;
+- профили видео, аудио, изображений и remux;
+- сжатие видео до заданного размера;
+- расширенная форма с выбором профиля, размера, overwrite и fallback;
+- VAAPI и NVENC с проверкой реального FFmpeg encoder/device и software fallback;
+- watch-folders с отдельным каталогом назначения;
+- безопасно зарезервированные временные файлы, atomic commit, `ffprobe` и полная decode-проверка;
+- логи и статусы jobs в `~/.local/state/media-studio/jobs/`.
+
+## Установка
+
+Нужны `ffmpeg`, `ffprobe`, `systemd-run`, `systemctl`, `kbuildsycoca6` или `kbuildsycoca5` и один диалоговый backend: `zenity` или `kdialog`. Для image-профилей нужен `magick`.
+`zenity` показывает все расширенные параметры одной формой; `kdialog` использует последовательные окна с теми же параметрами.
+
+```bash
+cargo build --release
+./target/release/media-studio install
+./target/release/media-studio doctor
+```
+
+Для x86_64 и ARM64 можно установить готовый бинарник без Rust toolchain:
+
+```bash
+curl --fail --location https://raw.githubusercontent.com/Stranmor/media-studio/main/install.sh | bash
+```
+
+Скрипт проверяет SHA-256 release asset, устанавливает бинарник в `~/.local/bin` и запускает `media-studio install`.
+
+После установки:
+
+- binary: `~/.local/bin/media-studio`;
+- Dolphin menus: `media-studio-video.desktop`, `media-studio-audio.desktop`, `media-studio-image.desktop` в `~/.local/share/kio/servicemenus/`;
+- config: `~/.config/media-studio/config.toml`;
+- job state: `~/.local/state/media-studio/jobs/`.
+
+Переиндексация KDE выполняется автоматически через доступный `kbuildsycoca6` или `kbuildsycoca5`.
+Каждое меню содержит только совместимые с MIME-группой действия; generic `desktop-file-validate` может ругаться на KDE-расширения `Service`/`Actions`, хотя KDE KIO их принимает.
+
+## Использование в Dolphin
+
+1. Выберите один или несколько медиафайлов.
+2. Откройте правый клик → `Media Studio`.
+3. Выберите профиль или `Расширенные настройки…`.
+4. Результат появится рядом с исходным файлом, если не задан отдельный каталог назначения.
+
+Для `.ogx` и других Ogg-файлов menu учитывает MIME `application/ogg` и `audio/ogg`.
+
+Для Debian/Ubuntu и Fedora/RHEL доступны binary assets в GitHub Release. Для Arch есть `packaging/arch/PKGBUILD`; после установки пакета выполните `media-studio install` для пользовательского Dolphin-меню.
+
+Экспериментальный Flatpak host-integration manifest находится в `packaging/flatpak/`: он сохраняет доступ к локальным media tools и user-systemd, поэтому не является sandboxed replacement для обычной Arch/Debian установки.
+
+## CLI
+
+```bash
+# обычный профиль
+media-studio enqueue --profile video_mp4 -- file.mkv
+
+# произвольный лимит размера
+media-studio enqueue --profile video_mp4 --target-size-mb 400 -- file.mkv
+
+# интерактивная форма
+media-studio choose -- file.mkv
+
+# инспекция
+media-studio inspect -- file.mkv
+
+# очередь
+media-studio queue list
+media-studio queue cancel JOB_ID
+```
+
+## Watch-folders
+
+Watch-folder создаёт user-systemd unit, который запускается после входа в графическую сессию:
+
+```bash
+media-studio watch add \
+  --id camera \
+  --source ~/Videos/in \
+  --destination ~/Videos/out \
+  --profile video_mp4
+
+media-studio watch list
+media-studio watch stop --id camera
+media-studio watch start --id camera
+media-studio watch remove --id camera
+```
+
+Обрабатываются только медиафайлы; файл должен оставаться неизменным не менее `settle_seconds`.
+Идентификатор watch-folder должен содержать только латинские буквы, цифры, `-` и `_`.
+
+## Аппаратные профили
+
+- `video_mp4_vaapi` — VAAPI с автоматическим поиском `/dev/dri/renderD*`;
+- `video_mp4_nvenc` — NVIDIA NVENC при наличии `h264_nvenc` в текущем FFmpeg;
+- `media-studio doctor` показывает эффективные `vaapi`/`nvenc` capabilities;
+- устройство VAAPI можно задать через `MEDIA_STUDIO_VAAPI_DEVICE` или `vaapi_device` в `config.toml`;
+- при недоступном или неисправном hardware encoder используется software-профиль, а причина fallback фиксируется в job log;
+- fail-closed можно включить в `config.toml`, установив `hardware_fallback = false`.
+
+## Удаление
+
+Обычное удаление оставляет config и job history:
+
+```bash
+media-studio uninstall
+```
+
+Команда удаляет binary, service menu, watch units и возвращает ранее скрытые legacy menus. Полное удаление пользовательского config/state выполняется только явно:
+
+```bash
+media-studio uninstall --purge
+```
+
+## Разработка
+
+```bash
+cargo fmt --check
+cargo clippy --all-targets -- -D warnings
+cargo test
+cargo build --release
+```
+
+CI дополнительно запускает KDE smoke-test с KDE cache builder, Dolphin service menus, ImageMagick/FFmpeg fixture и реальной проверкой результата через `ffprobe`.
+
+Архитектура: [D2 map](docs/media-studio.svg). Правила contribution: [CONTRIBUTING.md](CONTRIBUTING.md). Security policy: [SECURITY.md](SECURITY.md).
+
+--- END README.md ---
+[bound full-file sha256: d6732b7958a3bc67b2ec641e5dbc8f46feb204ada9ca521706513e006de515d1]
+
+--- BEGIN CHANGELOG.md (full file) ---
+# Changelog
+
+## [0.2.1] - 2026-08-25
+
+### Added
+
+- Capability-aware VAAPI/NVENC selection with automatic VAAPI render-node discovery.
+- `MEDIA_STUDIO_VAAPI_DEVICE` and `vaapi_device` configuration override.
+- Arch `media-studio-git` PKGBUILD and experimental host-integration Flatpak manifest.
+
+### Changed
+
+- `media-studio doctor` reports effective VAAPI/NVENC availability and selected device.
+- Hardware profiles fail over only after encoder/device capability checks and log the exact reason.
+
+## 0.1.0 — 2026-08-25
+
+- initial public release;
+- Dolphin service menu for KDE 6;
+- target-size video profiles and advanced form;
+- VAAPI/NVENC profiles with software fallback;
+- user-systemd queue and watch-folders;
+- verified output pipeline with atomic rename and decode checks.
+
+## [0.2.0] - 2026-08-25
+
+### Added
+
+- Separate Dolphin service menus for video, audio, and image files.
+- Atomic output commits with collision-safe filenames and reserved temporary files.
+- Absolute runtime discovery for FFmpeg, FFprobe, ImageMagick, systemd, and KDE helpers.
+- ARM64, Debian/Ubuntu, Fedora/RHEL, and Arch release packaging paths.
+- KDE/Dolphin, FFmpeg/ImageMagick, and cross-architecture CI coverage.
+
+### Changed
+
+- Legacy duplicate Dolphin menus are hidden during install and restored on uninstall.
+- Install script selects the matching x86_64 or ARM64 release asset.
+
+--- END CHANGELOG.md ---
+[bound full-file sha256: 8e0c1de8fdbad78055b597cb9bb1f0213a19f35584172ee40d565c172d3703db]
+
+--- BEGIN LICENSE (full file) ---
+MIT License
+
+Copyright (c) 2026 Stranmor
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+--- END LICENSE ---
+[bound full-file sha256: 814ba8cdecad8297f13e906bfe2e4279d5531c29e6aca469acf02a6a54c4198b]
+
+--- BEGIN src/main.rs (full file) ---
+mod engine;
+mod model;
+mod paths;
+mod queue;
+mod runtime;
+mod ui;
+
+use anyhow::{bail, Context, Result};
+use clap::{Parser, Subcommand};
+use std::collections::HashMap;
+use std::fs;
+use std::os::unix::fs::PermissionsExt;
+use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::thread;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+use model::{valid_watch_id, Config, WatchFolder};
+
+#[derive(Debug, Parser)]
+#[command(
+    name = "media-studio",
+    version,
+    about = "Media Studio — конвертация медиа из Dolphin"
+)]
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Debug, Subcommand)]
+enum Commands {
+    #[command(about = "Установить бинарник, Dolphin-меню и watch-units")]
+    Install {
+        #[arg(long)]
+        force_config: bool,
+    },
+    #[command(about = "Удалить установленные файлы; --purge удаляет config и историю")]
+    Uninstall {
+        #[arg(long)]
+        purge: bool,
+    },
+    #[command(about = "Проверить зависимости и текущую конфигурацию")]
+    Doctor,
+    #[command(about = "Открыть расширенный выбор профиля и поставить задания в очередь")]
+    Choose {
+        #[arg(trailing_var_arg = true)]
+        files: Vec<String>,
+    },
+    #[command(about = "Поставить файлы в user-systemd очередь по профилю")]
+    Enqueue {
+        #[arg(short, long)]
+        profile: String,
+        #[arg(long)]
+        target_size_mb: Option<u64>,
+        #[arg(long, action = clap::ArgAction::Set)]
+        hardware_fallback: Option<bool>,
+        #[arg(trailing_var_arg = true)]
+        files: Vec<String>,
+    },
+    #[command(hide = true)]
+    Run {
+        #[arg(long)]
+        job_id: String,
+        #[arg(short, long)]
+        profile: String,
+        #[arg(long)]
+        overwrite: bool,
+        #[arg(long)]
+        target_size_mb: Option<u64>,
+        #[arg(long, action = clap::ArgAction::Set)]
+        hardware_fallback: Option<bool>,
+        #[arg(long)]
+        output_dir: Option<PathBuf>,
+        #[arg(trailing_var_arg = true)]
+        files: Vec<String>,
+    },
+    #[command(about = "Показать техническую информацию о медиафайле")]
+    Inspect {
+        #[arg(long)]
+        json: bool,
+        #[arg(trailing_var_arg = true)]
+        files: Vec<String>,
+    },
+    #[command(about = "Показать или отменить задания")]
+    Queue {
+        #[command(subcommand)]
+        command: QueueCommand,
+    },
+    #[command(about = "Настроить автоматическую обработку каталогов")]
+    Watch {
+        #[command(subcommand)]
+        command: WatchCommand,
+    },
+    #[command(hide = true)]
+    WatchRun {
+        #[arg(long)]
+        id: String,
+    },
+    #[command(about = "Показать доступные профили с понятными названиями")]
+    Profile {
+        #[command(subcommand)]
+        command: ProfileCommand,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum QueueCommand {
+    List,
+    Cancel { job_id: String },
+}
+
+#[derive(Debug, Subcommand)]
+enum WatchCommand {
+    List,
+    Add {
+        #[arg(long)]
+        id: String,
+        #[arg(long)]
+        source: PathBuf,
+        #[arg(long)]
+        destination: PathBuf,
+        #[arg(short, long)]
+        profile: String,
+        #[arg(long, default_value_t = true, action = clap::ArgAction::Set)]
+        recursive: bool,
+        #[arg(long, default_value_t = 3)]
+        settle_seconds: u64,
+    },
+    Remove {
+        #[arg(long)]
+        id: String,
+    },
+    Start {
+        #[arg(long)]
+        id: String,
+    },
+    Stop {
+        #[arg(long)]
+        id: String,
+    },
+}
+
+#[derive(Debug, Subcommand)]
+enum ProfileCommand {
+    List,
+}
+
+fn main() {
+    if let Err(error) = run() {
+        ui::error("Media Studio: ошибка", &format_error(&error));
+        std::process::exit(1);
+    }
+}
+
+fn run() -> Result<()> {
+    let cli = Cli::parse();
+    match cli.command {
+        Commands::Install { force_config } => install(force_config),
+        Commands::Uninstall { purge } => uninstall(purge),
+        Commands::Doctor => doctor(),
+        Commands::Choose { files } => {
+            let config = load_config()?;
+            let choice = ui::choose_advanced(&config)?;
+            enqueue_with_profile(
+                &config,
+                &choice.profile,
+                choice.target_size_mb,
+                choice.hardware_fallback,
+                None,
+                choice.overwrite,
+                files,
+            )
+        }
+        Commands::Enqueue {
+            profile,
+            target_size_mb,
+            hardware_fallback,
+            files,
+        } => {
+            let config = load_config()?;
+            require_profile(&config, &profile)?;
+            enqueue_with_profile(
+                &config,
+                &profile,
+                target_size_mb,
+                effective_hardware_fallback(&config, hardware_fallback),
+                None,
+                false,
+                files,
+            )
+        }
+        Commands::Run {
+            job_id,
+            profile,
+            overwrite,
+            target_size_mb,
+            hardware_fallback,
+            output_dir,
+            files,
+        } => run_job(
+            &job_id,
+            &profile,
+            overwrite,
+            target_size_mb,
+            hardware_fallback,
+            output_dir,
+            files,
+        ),
+        Commands::Inspect { json, files } => inspect_files(json, files),
+        Commands::Queue { command } => match command {
+            QueueCommand::List => {
+                println!("{}", queue::list()?);
+                Ok(())
+            }
+            QueueCommand::Cancel { job_id } => {
+                queue::cancel(&job_id)?;
+                Ok(())
+            }
+        },
+        Commands::Watch { command } => run_watch_command(command),
+        Commands::WatchRun { id } => watch_run(&id),
+        Commands::Profile {
+            command: ProfileCommand::List,
+        } => {
+            let config = load_config()?;
+            for (id, profile) in config.profiles {
+                println!(
+                    "{id}\t{}\t{}\tengine={}\text=.{}",
+                    profile.category, profile.label, profile.engine, profile.extension
+                );
+            }
+            Ok(())
+        }
+    }
+}
+
+fn load_config() -> Result<Config> {
+    Config::load(&paths::config_path())
+}
+
+fn effective_hardware_fallback(config: &Config, override_value: Option<bool>) -> bool {
+    override_value.unwrap_or(config.hardware_fallback)
+}
+
+fn enqueue_with_profile(
+    config: &Config,
+    profile: &str,
+    target_size_mb: Option<u64>,
+    hardware_fallback: bool,
+    output_dir: Option<PathBuf>,
+    overwrite: bool,
+    files: Vec<String>,
+) -> Result<()> {
+    require_profile(config, profile)?;
+    let mut selected_profile = config
+        .profiles
+        .get(profile)
+        .expect("validated profile")
+        .clone();
+    if target_size_mb.is_some() {
+        selected_profile.target_size_mb = target_size_mb;
+    }
+    engine::ensure_tools(Some(&selected_profile))?;
+    let executable = paths::installed_binary_path();
+    let executable = if executable.is_file() {
+        executable
+    } else {
+        std::env::current_exe()?
+    };
+    let vaapi_device = std::env::var("MEDIA_STUDIO_VAAPI_DEVICE")
+        .ok()
+        .or_else(|| config.vaapi_device.clone());
+    let job_id = queue::enqueue(queue::EnqueueRequest {
+        executable: &executable,
+        profile,
+        target_size_mb,
+        hardware_fallback,
+        vaapi_device: vaapi_device.as_deref(),
+        output_dir,
+        overwrite,
+        files: &files,
+    })?;
+    println!(
+        "QUEUED job_id={job_id} profile={profile} files={}",
+        files.len()
+    );
+    Ok(())
+}
+
+fn run_job(
+    job_id: &str,
+    profile_id: &str,
+    overwrite: bool,
+    target_size_mb: Option<u64>,
+    hardware_fallback: Option<bool>,
+    output_dir: Option<PathBuf>,
+    raw_files: Vec<String>,
+) -> Result<()> {
+    anyhow::ensure!(
+        paths::valid_job_id(job_id),
+        "некорректный идентификатор задачи"
+    );
+    let config = load_config()?;
+    require_profile(&config, profile_id)?;
+    if raw_files.is_empty() {
+        bail!("задача {job_id} не содержит входных файлов");
+    }
+    let mut profile = config
+        .profiles
+        .get(profile_id)
+        .expect("validated profile")
+        .clone();
+    if target_size_mb.is_some() {
+        profile.target_size_mb = target_size_mb;
+    }
+    let mut runtime_config = config.clone();
+    runtime_config.hardware_fallback = effective_hardware_fallback(&config, hardware_fallback);
+    engine::ensure_tools(Some(&profile))?;
+    let log = paths::job_log_path(job_id);
+    if let Some(parent) = log.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    fs::write(
+        &log,
+        format!(
+            "JOB_ID={job_id}\nPROFILE={profile_id}\nLABEL={}\n",
+            profile.label
+        ),
+    )?;
+    paths::write_job_status(job_id, "running", &[("profile", profile_id.to_string())])?;
+    ui::notify(
+        "Media Studio",
+        &format!("Запущена задача {job_id}: {}", profile.label),
+    );
+
+    let mut ok = 0usize;
+    let mut failed = 0usize;
+    let mut outputs = Vec::new();
+    for raw in raw_files.iter() {
+        let input = paths::normalize_path_arg(raw);
+        let output = paths::output_path(&input, &profile, output_dir.as_deref(), overwrite);
+        let details = [
+            ("profile", profile_id.to_string()),
+            ("input", input.display().to_string()),
+            ("output", output.display().to_string()),
+        ];
+        paths::write_job_status(job_id, "running", &details)?;
+        match engine::convert(&runtime_config, &profile, &input, &output, overwrite, &log) {
+            Ok(result) => {
+                ok += 1;
+                outputs.push(result.output.clone());
+                println!(
+                    "OK {} -> {} (лог: {})",
+                    input.display(),
+                    result.output.display(),
+                    result.log.display()
+                );
+            }
+            Err(error) => {
+                failed += 1;
+                eprintln!(
+                    "FAIL {}: {} (лог: {})",
+                    input.display(),
+                    format_error(&error),
+                    log.display()
+                );
+            }
+        }
+    }
+    let state = if failed == 0 {
+        "completed"
+    } else if ok > 0 {
+        "partial"
+    } else {
+        "failed"
+    };
+    paths::write_job_status(
+        job_id,
+        state,
+        &[
+            ("profile", profile_id.to_string()),
+            ("ok", ok.to_string()),
+            ("failed", failed.to_string()),
+            ("log", log.display().to_string()),
+            (
+                "hardware_fallback",
+                fs::read_to_string(&log)
+                    .unwrap_or_default()
+                    .contains("HARDWARE_FALLBACK=")
+                    .to_string(),
+            ),
+        ],
+    )?;
+    if failed == 0 {
+        let fallback_note = if fs::read_to_string(&log)
+            .unwrap_or_default()
+            .contains("HARDWARE_FALLBACK=")
+        {
+            " Аппаратное ускорение недоступно, использован software fallback."
+        } else {
+            ""
+        };
+        let output_note = outputs
+            .first()
+            .map(|output| format!(" Первый результат: {}.", output.display()))
+            .unwrap_or_default();
+        ui::notify(
+            "Media Studio: готово",
+            &format!(
+                "{}: обработано {} файл(ов).{}{} Лог: {}",
+                profile.label,
+                ok,
+                output_note,
+                fallback_note,
+                log.display()
+            ),
+        );
+        Ok(())
+    } else {
+        ui::error(
+            "Media Studio: частичный результат",
+            &format!(
+                "Успешно: {ok}, ошибок: {failed}. Подробности: {}",
+                log.display()
+            ),
+        );
+        bail!("задача завершена с ошибками: успешно {ok}, ошибок {failed}")
+    }
+}
+
+fn inspect_files(json: bool, raw_files: Vec<String>) -> Result<()> {
+    if raw_files.is_empty() {
+        bail!("выберите хотя бы один файл для инспекции");
+    }
+    let mut dialog = String::new();
+    for raw in raw_files {
+        let input = paths::normalize_path_arg(&raw);
+        let body = engine::inspect(&input, json)?;
+        if json {
+            println!("{}", body);
+        } else {
+            println!("{}\n{}", input.display(), body.trim());
+            println!();
+            dialog.push_str(&format!("{}\n{}\n\n", input.display(), body.trim()));
+        }
+    }
+    if !json
+        && (std::env::var_os("DISPLAY").is_some() || std::env::var_os("WAYLAND_DISPLAY").is_some())
+    {
+        ui::show_info("Media Studio — информация о файле", &dialog);
+    }
+    Ok(())
+}
+
+fn require_profile(config: &Config, profile: &str) -> Result<()> {
+    if config.profiles.contains_key(profile) {
+        return Ok(());
+    }
+    let available = config
+        .profiles
+        .keys()
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(", ");
+    bail!("неизвестный профиль `{profile}`. Доступны: {available}")
+}
+
+fn run_watch_command(command: WatchCommand) -> Result<()> {
+    match command {
+        WatchCommand::List => {
+            let config = load_config()?;
+            if config.watch_folders.is_empty() {
+                println!("Watch-folders не настроены.");
+            } else {
+                for folder in config.watch_folders {
+                    println!(
+                        "{}\t{} -> {}\tprofile={}\tenabled={}\trecursive={}",
+                        folder.id,
+                        folder.source,
+                        folder.destination,
+                        folder.profile,
+                        folder.enabled,
+                        folder.recursive
+                    );
+                }
+            }
+            Ok(())
+        }
+        WatchCommand::Add {
+            id,
+            source,
+            destination,
+            profile,
+            recursive,
+            settle_seconds,
+        } => {
+            ensure_watch_id(&id)?;
+            let mut config = load_config()?;
+            let previous = config.clone();
+            require_profile(&config, &profile)?;
+            let source = fs::canonicalize(&source)
+                .with_context(|| format!("каталог источника не найден: {}", source.display()))?;
+            if !source.is_dir() {
+                bail!("каталог источника не найден: {}", source.display());
+            }
+            fs::create_dir_all(&destination)?;
+            let destination = fs::canonicalize(&destination)?;
+            config.watch_folders.retain(|folder| folder.id != id);
+            config.watch_folders.push(WatchFolder {
+                id: id.clone(),
+                source: source.display().to_string(),
+                destination: destination.display().to_string(),
+                profile,
+                recursive,
+                enabled: true,
+                settle_seconds,
+            });
+            config.validate()?;
+            config.write(&paths::config_path())?;
+            if let Err(error) = install_watch_unit(
+                &config,
+                config
+                    .watch_folders
+                    .iter()
+                    .find(|folder| folder.id == id)
+                    .expect("watch folder"),
+            ) {
+                previous.write(&paths::config_path())?;
+                let _ = fs::remove_file(paths::watch_service_path(&id));
+                return Err(error);
+            }
+            println!("WATCH_ADDED id={id} state=enabled");
+            Ok(())
+        }
+        WatchCommand::Remove { id } => {
+            ensure_watch_id(&id)?;
+            let mut config = load_config()?;
+            if !config.watch_folders.iter().any(|folder| folder.id == id) {
+                bail!("watch-folder не найден: {id}");
+            }
+            config.watch_folders.retain(|folder| folder.id != id);
+            config.write(&paths::config_path())?;
+            let unit = format!("media-studio-watch-{id}.service");
+            let _ = required_command("systemctl")?
+                .args(["--user", "disable", "--now", &unit])
+                .status();
+            let _ = fs::remove_file(paths::watch_service_path(&id));
+            let _ = required_command("systemctl")?
+                .args(["--user", "daemon-reload"])
+                .status();
+            println!("WATCH_REMOVED id={id}");
+            Ok(())
+        }
+        WatchCommand::Start { id } => {
+            ensure_watch_id(&id)?;
+            let mut config = load_config()?;
+            let index = config
+                .watch_folders
+                .iter()
+                .position(|folder| folder.id == id)
+                .with_context(|| format!("watch-folder не найден: {id}"))?;
+            config.watch_folders[index].enabled = true;
+            let folder = config.watch_folders[index].clone();
+            install_watch_unit(&config, &folder)?;
+            config.write(&paths::config_path())?;
+            println!("WATCH_STARTED id={id}");
+            Ok(())
+        }
+        WatchCommand::Stop { id } => {
+            ensure_watch_id(&id)?;
+            let mut config = load_config()?;
+            let unit = format!("media-studio-watch-{id}.service");
+            let status = required_command("systemctl")?
+                .args(["--user", "disable", "--now", &unit])
+                .status()?;
+            if !status.success() {
+                bail!("не удалось остановить {unit}");
+            }
+            if let Some(folder) = config
+                .watch_folders
+                .iter_mut()
+                .find(|folder| folder.id == id)
+            {
+                folder.enabled = false;
+                config.write(&paths::config_path())?;
+            } else {
+                bail!("watch-folder не найден: {id}");
+            }
+            println!("WATCH_STOPPED id={id}");
+            Ok(())
+        }
+    }
+}
+
+fn ensure_watch_id(id: &str) -> Result<()> {
+    anyhow::ensure!(
+        valid_watch_id(id),
+        "id watch-folder должен содержать только A-Z, a-z, 0-9, '-' или '_' и быть не длиннее 64 символов"
+    );
+    Ok(())
+}
+
+fn install_watch_unit(config: &Config, folder: &WatchFolder) -> Result<()> {
+    let binary = paths::installed_binary_path();
+    let path = paths::watch_service_path(&folder.id);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let binary = systemd_quote(&binary);
+    let vaapi_environment = std::env::var("MEDIA_STUDIO_VAAPI_DEVICE")
+        .ok()
+        .or_else(|| config.vaapi_device.clone())
+        .map(|device| {
+            format!(
+                "Environment=MEDIA_STUDIO_VAAPI_DEVICE={}\n",
+                systemd_quote(Path::new(&device))
+            )
+        })
+        .unwrap_or_default();
+    let unit = format!("[Unit]\nDescription=Media Studio watch-folder {}\nAfter=graphical-session.target\n\n[Service]\n{}ExecStart={} watch-run --id {}\nRestart=always\nRestartSec=4\n\n[Install]\nWantedBy=default.target\n", folder.id, vaapi_environment, binary, folder.id);
+    paths::atomic_write(&path, unit.as_bytes())?;
+    let reload = required_command("systemctl")?
+        .args(["--user", "daemon-reload"])
+        .status()?;
+    if !reload.success() {
+        bail!("systemd user не принял daemon-reload");
+    }
+    let unit_name = format!("media-studio-watch-{}.service", folder.id);
+    let enabled = required_command("systemctl")?
+        .args(["--user", "enable", "--now", &unit_name])
+        .status()?;
+    if !enabled.success() {
+        bail!("не удалось включить {unit_name}");
+    }
+    Ok(())
+}
+
+fn preflight_install() -> Result<()> {
+    let required = ["ffmpeg", "ffprobe", "systemd-run", "systemctl"];
+    let missing = required
+        .iter()
+        .filter(|tool| find_on_path(tool).is_none())
+        .copied()
+        .collect::<Vec<_>>();
+    if !missing.is_empty() {
+        bail!(
+            "нельзя установить Media Studio: отсутствуют {}",
+            missing.join(", ")
+        );
+    }
+    if kde_cache_builder().is_none() {
+        bail!("нельзя установить Media Studio: отсутствуют kbuildsycoca6 или kbuildsycoca5");
+    }
+    if find_on_path("zenity").is_none() && find_on_path("kdialog").is_none() {
+        bail!("нельзя установить Media Studio: нужен zenity или kdialog для расширенного меню");
+    }
+    Ok(())
+}
+
+fn watch_run(id: &str) -> Result<()> {
+    let mut seen = HashMap::<PathBuf, SystemTime>::new();
+    loop {
+        let config = load_config()?;
+        let folder = config
+            .watch_folders
+            .iter()
+            .find(|folder| folder.id == id)
+            .with_context(|| format!("watch-folder не найден: {id}"))?
+            .clone();
+        if !folder.enabled {
+            thread::sleep(Duration::from_secs(10));
+            continue;
+        }
+        let source = fs::canonicalize(&folder.source)
+            .with_context(|| format!("каталог watch-folder не найден: {}", folder.source))?;
+        let destination = fs::canonicalize(&folder.destination)
+            .with_context(|| format!("каталог назначения не найден: {}", folder.destination))?;
+        if !source.is_dir() {
+            bail!("каталог watch-folder не найден: {}", source.display());
+        }
+        for input in scan_media_files(&source, folder.recursive)? {
+            if input.starts_with(&destination) {
+                continue;
+            }
+            let metadata = match fs::metadata(&input) {
+                Ok(metadata) => metadata,
+                Err(_) => continue,
+            };
+            let modified = metadata.modified().unwrap_or(UNIX_EPOCH);
+            let age = SystemTime::now()
+                .duration_since(modified)
+                .unwrap_or_default()
+                .as_secs();
+            if age < folder.settle_seconds {
+                continue;
+            }
+            if seen.get(&input).copied() == Some(modified) {
+                continue;
+            }
+            enqueue_with_profile(
+                &config,
+                &folder.profile,
+                None,
+                config.hardware_fallback,
+                Some(destination.clone()),
+                false,
+                vec![input.display().to_string()],
+            )?;
+            seen.insert(input, modified);
+        }
+        thread::sleep(Duration::from_secs(5));
+    }
+}
+
+fn scan_media_files(root: &Path, recursive: bool) -> Result<Vec<PathBuf>> {
+    let mut files = Vec::new();
+    for entry in fs::read_dir(root)
+        .with_context(|| format!("не удалось прочитать каталог {}", root.display()))?
+    {
+        let entry = entry?;
+        let path = entry.path();
+        let metadata = fs::symlink_metadata(&path)?;
+        if metadata.file_type().is_symlink() {
+            continue;
+        }
+        if metadata.is_dir() && recursive {
+            files.extend(scan_media_files(&path, true)?);
+        }
+        if metadata.is_file() && is_media_path(&path) {
+            files.push(path);
+        }
+    }
+    Ok(files)
+}
+
+fn is_media_path(path: &Path) -> bool {
+    matches!(
+        path.extension()
+            .and_then(|extension| extension.to_str())
+            .unwrap_or_default()
+            .to_ascii_lowercase()
+            .as_str(),
+        "3gp"
+            | "avi"
+            | "avif"
+            | "flac"
+            | "gif"
+            | "jpeg"
+            | "jpg"
+            | "m4a"
+            | "mkv"
+            | "mov"
+            | "mp3"
+            | "mp4"
+            | "ogg"
+            | "ogv"
+            | "ogx"
+            | "opus"
+            | "png"
+            | "wav"
+            | "webm"
+            | "webp"
+            | "wmv"
+    )
+}
+
+fn doctor() -> Result<()> {
+    let config_path = paths::config_path();
+    let config = load_config()?;
+    println!("Media Studio doctor");
+    println!("config: {}", config_path.display());
+    println!("profiles: {}", config.profiles.len());
+    println!("default_profile: {}", config.default_profile);
+    println!("verify_results: {}", config.verify_results);
+    println!("ffmpeg_threads: {}", config.ffmpeg_threads);
+    let mut missing_core = Vec::new();
+    for tool in ["ffmpeg", "ffprobe", "systemd-run", "systemctl"] {
+        match find_on_path(tool) {
+            Some(path) => println!("{tool}: OK ({})", path.display()),
+            None => {
+                println!("{tool}: MISSING");
+                missing_core.push(tool);
+            }
+        }
+    }
+    match kde_cache_builder() {
+        Some(path) => println!("kde_cache_builder: OK ({})", path.display()),
+        None => {
+            println!("kde_cache_builder: MISSING (kbuildsycoca6 or kbuildsycoca5)");
+            missing_core.push("kbuildsycoca6|kbuildsycoca5");
+        }
+    }
+    let dialog_backend = find_on_path("zenity").or_else(|| find_on_path("kdialog"));
+    match dialog_backend {
+        Some(path) => println!("dialog_backend: OK ({})", path.display()),
+        None => {
+            println!("dialog_backend: MISSING (zenity or kdialog)");
+            missing_core.push("zenity|kdialog");
+        }
+    }
+    for tool in ["magick", "notify-send"] {
+        match find_on_path(tool) {
+            Some(path) => println!("{tool}: OK ({})", path.display()),
+            None => println!("{tool}: OPTIONAL-MISSING"),
+        }
+    }
+    for line in engine::hardware_diagnostics(&config) {
+        println!("{line}");
+    }
+    println!("binary: {}", paths::installed_binary_path().display());
+    println!(
+        "service_menus: {}",
+        paths::service_menu_paths()
+            .iter()
+            .map(|path| path.display().to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
+    if !missing_core.is_empty() {
+        bail!(
+            "не хватает обязательных инструментов: {}",
+            missing_core.join(", ")
+        );
+    }
+    Ok(())
+}
+
+fn install(force_config: bool) -> Result<()> {
+    preflight_install()?;
+    let source = std::env::current_exe().context("не удалось определить текущий бинарник")?;
+    let target = paths::installed_binary_path();
+    if source != target {
+        if let Some(parent) = target.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::copy(&source, &target)
+            .with_context(|| format!("не удалось установить бинарник в {}", target.display()))?;
+    }
+    fs::set_permissions(&target, fs::Permissions::from_mode(0o755))?;
+
+    let config_path = paths::config_path();
+    let config = if force_config || !config_path.exists() {
+        let config = Config::built_in();
+        config.write(&config_path)?;
+        config
+    } else {
+        let config = Config::load(&config_path)?;
+        config.write(&config_path)?;
+        config
+    };
+    let menu_paths = paths::service_menu_paths();
+    fs::create_dir_all(paths::service_menu_dir())?;
+    for (menu_path, menu) in menu_paths.iter().zip(service_menus(&target)) {
+        fs::write(menu_path, menu)?;
+        fs::set_permissions(menu_path, fs::Permissions::from_mode(0o755))?;
+    }
+    let legacy_menu = paths::legacy_service_menu_path();
+    if legacy_menu.is_file() {
+        fs::remove_file(&legacy_menu)?;
+    }
+    hide_legacy_menus()?;
+    for folder in &config.watch_folders {
+        if folder.enabled {
+            install_watch_unit(&config, folder)?;
+        }
+    }
+    let cache =
+        kde_cache_builder().map(|builder| Command::new(builder).arg("--noincremental").status());
+    println!("installed_binary={}", target.display());
+    println!("config={}", config_path.display());
+    println!(
+        "service_menus={}",
+        menu_paths
+            .iter()
+            .map(|path| path.display().to_string())
+            .collect::<Vec<_>>()
+            .join(",")
+    );
+    println!(
+        "kde_cache={}",
+        match cache {
+            Some(Ok(status)) if status.success() => "updated",
+            Some(Ok(status)) =>
+                return Err(anyhow::anyhow!(
+                    "KDE cache builder завершился с кодом {status}"
+                )),
+            None => return Err(anyhow::anyhow!("не найден kbuildsycoca6 или kbuildsycoca5")),
+            Some(Err(error)) => return Err(error.into()),
+        }
+    );
+    Ok(())
+}
+
+fn uninstall(purge: bool) -> Result<()> {
+    let mut warnings = Vec::new();
+    if let Some(systemctl) = runtime::optional("systemctl") {
+        if let Ok(status) = Command::new(&systemctl)
+            .args(["--user", "daemon-reload"])
+            .status()
+        {
+            if !status.success() {
+                warnings.push(format!(
+                    "первичный daemon-reload завершился с кодом {status}"
+                ));
+            }
+        }
+    } else {
+        warnings.push("systemctl не найден; user units не остановлены".to_string());
+    }
+    if let Ok(entries) = fs::read_dir(paths::systemd_user_dir()) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+                continue;
+            };
+            if name.starts_with("media-studio-watch-") && name.ends_with(".service") {
+                if let Some(systemctl) = runtime::optional("systemctl") {
+                    match Command::new(systemctl)
+                        .args(["--user", "disable", "--now", name])
+                        .status()
+                    {
+                        Ok(status) if status.success() => {}
+                        Ok(status) => {
+                            warnings.push(format!("не удалось остановить {name}: код {status}"))
+                        }
+                        Err(error) => {
+                            warnings.push(format!("не удалось остановить {name}: {error}"))
+                        }
+                    }
+                } else {
+                    warnings.push(format!("systemctl не найден; unit {name} не остановлен"));
+                }
+                let _ = fs::remove_file(path);
+            }
+        }
+    }
+    if let Some(systemctl) = runtime::optional("systemctl") {
+        match Command::new(systemctl)
+            .args(["--user", "daemon-reload"])
+            .status()
+        {
+            Ok(status) if status.success() => {}
+            Ok(status) => warnings.push(format!(
+                "финальный daemon-reload завершился с кодом {status}"
+            )),
+            Err(error) => warnings.push(format!(
+                "не удалось выполнить финальный daemon-reload: {error}"
+            )),
+        }
+    } else {
+        warnings.push("systemctl не найден; финальный daemon-reload пропущен".to_string());
+    }
+    let binary = paths::installed_binary_path();
+    for menu in paths::service_menu_paths()
+        .into_iter()
+        .chain(std::iter::once(paths::legacy_service_menu_path()))
+    {
+        if menu.is_file() {
+            fs::remove_file(menu)?;
+        }
+    }
+    if binary.is_file() {
+        fs::remove_file(&binary)?;
+    }
+    restore_legacy_menus()?;
+    if purge {
+        let config_dir = paths::config_path()
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| paths::home_dir().join(".config/media-studio"));
+        let state_dir = paths::state_dir();
+        if config_dir.is_dir() {
+            fs::remove_dir_all(config_dir)?;
+        }
+        if state_dir.is_dir() {
+            fs::remove_dir_all(state_dir)?;
+        }
+    }
+    let cache =
+        kde_cache_builder().map(|builder| Command::new(builder).arg("--noincremental").status());
+    println!("uninstalled_binary={}", binary.display());
+    println!(
+        "uninstalled_service_menus={}",
+        paths::service_menu_dir().display()
+    );
+    println!("purged={purge}");
+    match cache {
+        Some(Ok(status)) if status.success() => {}
+        Some(Ok(status)) => warnings.push(format!("KDE cache builder завершился с кодом {status}")),
+        None => warnings
+            .push("kbuildsycoca6 и kbuildsycoca5 не найдены; KDE cache не обновлён".to_string()),
+        Some(Err(error)) => warnings.push(format!("не удалось обновить KDE cache: {error}")),
+    }
+    if warnings.is_empty() {
+        Ok(())
+    } else {
+        println!("uninstall_state=partial");
+        bail!(
+            "удаление завершено с предупреждениями: {}",
+            warnings.join("; ")
+        )
+    }
+}
+
+fn hide_legacy_menus() -> Result<()> {
+    let legacy = [
+        "compress-video-max-400mb.desktop",
+        "compress-video-to-400mb.desktop",
+        "compress-video-to-custom-size.desktop",
+        "video-tools.desktop",
+        "convert-audio-to-opus.desktop",
+    ];
+    let source_dir = paths::service_menu_dir();
+    let disabled_dir = source_dir.join("disabled");
+    fs::create_dir_all(&disabled_dir)?;
+    for name in legacy {
+        let source = source_dir.join(name);
+        if source.is_file() {
+            let target = disabled_dir.join(name);
+            if !target.exists() {
+                fs::rename(&source, &target)?;
+            }
+        }
+    }
+    Ok(())
+}
+
+fn restore_legacy_menus() -> Result<()> {
+    let source_dir = paths::service_menu_dir();
+    let disabled_dir = source_dir.join("disabled");
+    if !disabled_dir.is_dir() {
+        return Ok(());
+    }
+    for entry in fs::read_dir(&disabled_dir)?.flatten() {
+        let source = entry.path();
+        let Some(name) = source.file_name() else {
+            continue;
+        };
+        let target = source_dir.join(name);
+        if !target.exists() {
+            fs::rename(source, target)?;
+        }
+    }
+    let _ = fs::remove_dir(&disabled_dir);
+    Ok(())
+}
+
+#[derive(Clone, Copy)]
+struct MenuAction {
+    id: &'static str,
+    name: &'static str,
+    name_ru: &'static str,
+    icon: &'static str,
+    command: &'static str,
+}
+
+const VIDEO_ACTIONS: &[MenuAction] = &[
+    MenuAction {
+        id: "mp4",
+        name: "Video → MP4 (H.264)",
+        name_ru: "Видео → MP4 (H.264)",
+        icon: "video-x-generic",
+        command: "enqueue --profile video_mp4",
+    },
+    MenuAction {
+        id: "mp4hq",
+        name: "Video → MP4 (H.264 HQ)",
+        name_ru: "Видео → MP4 (H.264 HQ)",
+        icon: "video-x-generic",
+        command: "enqueue --profile video_mp4_hq",
+    },
+    MenuAction {
+        id: "h265",
+        name: "Video → MP4 (H.265)",
+        name_ru: "Видео → MP4 (H.265)",
+        icon: "video-x-generic",
+        command: "enqueue --profile video_mp4_h265",
+    },
+    MenuAction {
+        id: "webm",
+        name: "Video → WebM (AV1/Opus)",
+        name_ru: "Видео → WebM (AV1/Opus)",
+        icon: "video-x-generic",
+        command: "enqueue --profile video_webm_av1",
+    },
+    MenuAction {
+        id: "size400",
+        name: "Video → MP4 (до 400 МБ)",
+        name_ru: "Видео → MP4 (до 400 МБ)",
+        icon: "video-x-generic",
+        command: "enqueue --profile video_mp4_400mb",
+    },
+    MenuAction {
+        id: "max400",
+        name: "Video → MP4 (сильное сжатие, до 400 МБ)",
+        name_ru: "Видео → MP4 (сильное сжатие, до 400 МБ)",
+        icon: "video-x-generic",
+        command: "enqueue --profile video_mp4_max_400mb",
+    },
+    MenuAction {
+        id: "vaapi",
+        name: "Video → MP4 (VAAPI)",
+        name_ru: "Видео → MP4 (VAAPI)",
+        icon: "video-x-generic",
+        command: "enqueue --profile video_mp4_vaapi",
+    },
+    MenuAction {
+        id: "nvenc",
+        name: "Video → MP4 (NVENC)",
+        name_ru: "Видео → MP4 (NVENC)",
+        icon: "video-x-generic",
+        command: "enqueue --profile video_mp4_nvenc",
+    },
+    MenuAction {
+        id: "opus",
+        name: "Extract audio → Opus",
+        name_ru: "Извлечь аудио → Opus",
+        icon: "audio-x-generic",
+        command: "enqueue --profile extract_audio_opus",
+    },
+    MenuAction {
+        id: "remux",
+        name: "Container → MKV (no re-encode)",
+        name_ru: "Контейнер → MKV (без перекодирования)",
+        icon: "package-x-generic",
+        command: "enqueue --profile remux_mkv",
+    },
+    MenuAction {
+        id: "strip",
+        name: "Video without audio",
+        name_ru: "Видео без аудио",
+        icon: "audio-volume-muted",
+        command: "enqueue --profile strip_audio",
+    },
+    MenuAction {
+        id: "advanced",
+        name: "Advanced profile…",
+        name_ru: "Расширенный профиль…",
+        icon: "configure",
+        command: "choose",
+    },
+    MenuAction {
+        id: "inspect",
+        name: "Inspect media",
+        name_ru: "Информация о медиафайле",
+        icon: "dialog-information",
+        command: "inspect",
+    },
+];
+
+const AUDIO_ACTIONS: &[MenuAction] = &[
+    MenuAction {
+        id: "mp3",
+        name: "Audio → MP3",
+        name_ru: "Аудио → MP3",
+        icon: "audio-x-generic",
+        command: "enqueue --profile audio_mp3",
+    },
+    MenuAction {
+        id: "flac",
+        name: "Audio → FLAC",
+        name_ru: "Аудио → FLAC",
+        icon: "audio-x-generic",
+        command: "enqueue --profile audio_flac",
+    },
+    MenuAction {
+        id: "opus",
+        name: "Audio → Opus",
+        name_ru: "Аудио → Opus",
+        icon: "audio-x-generic",
+        command: "enqueue --profile audio_opus",
+    },
+    MenuAction {
+        id: "advanced",
+        name: "Advanced profile…",
+        name_ru: "Расширенный профиль…",
+        icon: "configure",
+        command: "choose",
+    },
+    MenuAction {
+        id: "inspect",
+        name: "Inspect media",
+        name_ru: "Информация о медиафайле",
+        icon: "dialog-information",
+        command: "inspect",
+    },
+];
+
+const IMAGE_ACTIONS: &[MenuAction] = &[
+    MenuAction {
+        id: "webp",
+        name: "Image → WebP",
+        name_ru: "Изображение → WebP",
+        icon: "image-x-generic",
+        command: "enqueue --profile image_webp",
+    },
+    MenuAction {
+        id: "jpeg",
+        name: "Image → JPEG",
+        name_ru: "Изображение → JPEG",
+        icon: "image-x-generic",
+        command: "enqueue --profile image_jpeg",
+    },
+    MenuAction {
+        id: "avif",
+        name: "Image → AVIF",
+        name_ru: "Изображение → AVIF",
+        icon: "image-x-generic",
+        command: "enqueue --profile image_avif",
+    },
+    MenuAction {
+        id: "resize",
+        name: "Image → maximum 1920×1080",
+        name_ru: "Изображение → максимум 1920×1080",
+        icon: "image-x-generic",
+        command: "enqueue --profile image_resize_1080",
+    },
+    MenuAction {
+        id: "advanced",
+        name: "Advanced profile…",
+        name_ru: "Расширенный профиль…",
+        icon: "configure",
+        command: "choose",
+    },
+    MenuAction {
+        id: "inspect",
+        name: "Inspect media",
+        name_ru: "Информация о медиафайле",
+        icon: "dialog-information",
+        command: "inspect",
+    },
+];
+
+fn service_menus(executable: &Path) -> Vec<String> {
+    vec![
+        service_menu(
+            executable,
+            "Media Studio — Video",
+            "Видео",
+            "video/*;video/ogg;",
+            VIDEO_ACTIONS,
+        ),
+        service_menu(
+            executable,
+            "Media Studio — Audio",
+            "Аудио",
+            "audio/*;application/ogg;application/x-ogg;audio/ogg;audio/opus;audio/x-opus+ogg;",
+            AUDIO_ACTIONS,
+        ),
+        service_menu(
+            executable,
+            "Media Studio — Images",
+            "Изображения",
+            "image/*;",
+            IMAGE_ACTIONS,
+        ),
+    ]
+}
+
+fn service_menu(
+    executable: &Path,
+    name: &str,
+    name_ru: &str,
+    mime_types: &str,
+    actions: &[MenuAction],
+) -> String {
+    let exe = desktop_quote(executable);
+    let action_ids = actions
+        .iter()
+        .map(|action| action.id)
+        .collect::<Vec<_>>()
+        .join(";");
+    let mut output = format!(
+        "[Desktop Entry]\nType=Service\nServiceTypes=KonqPopupMenu/Plugin\nX-KDE-ServiceTypes=KonqPopupMenu/Plugin\nName={name}\nName[ru]={name_ru}\nMimeType={mime_types}\nActions={action_ids};\nX-KDE-Submenu=Media Studio\nX-KDE-Submenu[ru]=Media Studio\nIcon=applications-multimedia\n"
+    );
+    for action in actions {
+        output.push_str(&format!(
+            "\n[Desktop Action {}]\nName={}\nName[ru]={}\nIcon={}\nExec={} {} %F\n",
+            action.id, action.name, action.name_ru, action.icon, exe, action.command
+        ));
+    }
+    output
+}
+
+fn desktop_quote(path: &Path) -> String {
+    let raw = path
+        .to_string_lossy()
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"");
+    format!("\"{raw}\"")
+}
+
+fn systemd_quote(path: &Path) -> String {
+    let raw = path
+        .to_string_lossy()
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"");
+    format!("\"{raw}\"")
+}
+
+fn find_on_path(name: &str) -> Option<PathBuf> {
+    runtime::optional(name)
+}
+
+fn kde_cache_builder() -> Option<PathBuf> {
+    runtime::optional("kbuildsycoca6").or_else(|| runtime::optional("kbuildsycoca5"))
+}
+
+fn required_command(name: &str) -> Result<Command> {
+    Ok(Command::new(runtime::required(name)?))
+}
+
+fn format_error(error: &anyhow::Error) -> String {
+    let mut text = format!("{error:#}");
+    if text.len() > 1200 {
+        text.truncate(1200);
+        text.push('…');
+    }
+    text
+}
+
+#[allow(dead_code)]
+fn _stable_id() -> String {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    format!("{}-{}", nanos, std::process::id())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn menu_quotes_executable() {
+        let menus = service_menus(Path::new("/tmp/media studio"));
+        assert_eq!(menus.len(), 3);
+        assert!(menus[0].contains("Exec=\"/tmp/media studio\" enqueue"));
+        assert!(menus[0].contains("MimeType=video/*;"));
+        assert!(menus[1].contains("MimeType=audio/*;"));
+        assert!(menus[2].contains("MimeType=image/*;"));
+        assert!(!menus[2].contains("video_mp4"));
+        assert!(!menus[1].contains("image_webp"));
+    }
+
+    #[test]
+    fn watch_unit_quotes_binary_path() {
+        assert_eq!(
+            systemd_quote(Path::new("/tmp/media studio/bin")),
+            "\"/tmp/media studio/bin\""
+        );
+    }
+
+    #[test]
+    fn built_in_config_is_valid() {
+        let config = Config::built_in();
+        config.validate().expect("built-in config must validate");
+        assert!(config.profiles.len() >= 10);
+    }
+
+    #[test]
+    fn hardware_fallback_uses_config_unless_cli_overrides_it() {
+        let mut config = Config::built_in();
+        config.hardware_fallback = false;
+        assert!(!effective_hardware_fallback(&config, None));
+        assert!(effective_hardware_fallback(&config, Some(true)));
+        assert!(!effective_hardware_fallback(&config, Some(false)));
+    }
+}
+
+--- END src/main.rs ---
+[bound full-file sha256: 053381b57aceaf93b7996f5bba23febccad7eb0d0b126c2bfd8f01f512e4a288]
+
+--- BEGIN src/engine.rs (full file) ---
+use anyhow::{bail, Context, Result};
+use std::fs::{self, File, OpenOptions};
+use std::io::Write;
+use std::os::unix::fs::FileTypeExt;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+use tempfile::{Builder, NamedTempFile};
+
+use crate::model::{Config, HardwareBackend, Profile};
+use crate::runtime;
+
+pub struct Converted {
+    pub output: PathBuf,
+    pub log: PathBuf,
+}
+
+pub fn convert(
+    config: &Config,
+    profile: &Profile,
+    input: &Path,
+    output: &Path,
+    overwrite: bool,
+    log: &Path,
+) -> Result<Converted> {
+    if !input.is_file() {
+        bail!(
+            "входной объект не является обычным файлом: {}",
+            input.display()
+        );
+    }
+    if let Some(parent) = output.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    if let Some(parent) = log.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let mut log_file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log)
+        .with_context(|| format!("не удалось открыть лог {}", log.display()))?;
+    let extension = output
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("tmp");
+    let temp = Builder::new()
+        .prefix(".media-studio-")
+        .suffix(&format!(".part.{extension}"))
+        .tempfile_in(output.parent().unwrap_or_else(|| Path::new(".")))?;
+    let temp_path = temp.path().to_path_buf();
+    writeln!(log_file, "INPUT={}", input.display())?;
+    writeln!(log_file, "OUTPUT_REQUESTED={}", output.display())?;
+    writeln!(log_file, "ENGINE={}", profile.engine)?;
+
+    let status = match profile.engine.as_str() {
+        "ffmpeg" => run_ffmpeg(config, profile, input, &temp_path, &mut log_file),
+        "magick" => run_magick(profile, input, &temp_path, &mut log_file),
+        other => bail!("неподдерживаемый engine: {other}"),
+    }?;
+    if !status.success() {
+        bail!(
+            "конвертация завершилась с кодом {status}; подробности: {}",
+            log.display()
+        );
+    }
+    if !temp_path.is_file() || fs::metadata(&temp_path)?.len() == 0 {
+        bail!(
+            "движок завершился успешно, но временный результат пуст: {}",
+            temp_path.display()
+        );
+    }
+    if config.verify_results {
+        verify(profile, &temp_path, &mut log_file)?;
+    }
+    let actual_output = persist_output(temp, output, overwrite)?;
+    writeln!(log_file, "OUTPUT_COMMITTED={}", actual_output.display())?;
+    writeln!(log_file, "RESULT=verified")?;
+    Ok(Converted {
+        output: actual_output,
+        log: log.to_path_buf(),
+    })
+}
+
+fn persist_output(temp: NamedTempFile, requested: &Path, overwrite: bool) -> Result<PathBuf> {
+    if overwrite {
+        temp.persist(requested).map_err(|error| {
+            anyhow::anyhow!(
+                "не удалось атомарно заменить {}: {}",
+                requested.display(),
+                error.error
+            )
+        })?;
+        return Ok(requested.to_path_buf());
+    }
+    let mut temp = temp;
+    for index in 0..10_000u32 {
+        let candidate = if index == 0 {
+            requested.to_path_buf()
+        } else {
+            let stem = requested
+                .file_stem()
+                .and_then(|value| value.to_str())
+                .unwrap_or("output");
+            let extension = requested
+                .extension()
+                .and_then(|value| value.to_str())
+                .unwrap_or("bin");
+            requested
+                .parent()
+                .unwrap_or_else(|| Path::new("."))
+                .join(format!("{stem}-{index}.{extension}"))
+        };
+        match temp.persist_noclobber(&candidate) {
+            Ok(_) => return Ok(candidate),
+            Err(error) if error.error.kind() == std::io::ErrorKind::AlreadyExists => {
+                temp = error.file;
+            }
+            Err(error) => {
+                return Err(anyhow::anyhow!(
+                    "не удалось атомарно сохранить {}: {}",
+                    candidate.display(),
+                    error.error
+                ));
+            }
+        }
+    }
+    bail!(
+        "не удалось зарезервировать свободное имя результата рядом с {}",
+        requested.display()
+    )
+}
+
+fn run_ffmpeg(
+    config: &Config,
+    profile: &Profile,
+    input: &Path,
+    temp: &Path,
+    log: &mut File,
+) -> Result<std::process::ExitStatus> {
+    if profile.target_size_mb.is_some() {
+        return run_ffmpeg_target(config, profile, input, temp, log);
+    }
+    run_ffmpeg_once(config, profile, input, temp, log, profile.args.clone())
+}
+
+fn run_ffmpeg_target(
+    config: &Config,
+    profile: &Profile,
+    input: &Path,
+    temp: &Path,
+    log: &mut File,
+) -> Result<std::process::ExitStatus> {
+    let target_mb = profile.target_size_mb.expect("target profile");
+    let duration = probe_duration(input)?;
+    if duration <= 0.0 {
+        bail!("не удалось определить длительность для расчёта целевого размера");
+    }
+    let target_bytes = target_mb.saturating_mul(1_000_000);
+    let audio_kbps = if profile.target_audio_bitrate_kbps == 0 {
+        128
+    } else {
+        profile.target_audio_bitrate_kbps
+    } as f64;
+    let total_kbps = (target_bytes as f64 * 8.0 / duration / 1000.0 * 0.965).max(audio_kbps + 96.0);
+    let mut video_kbps = (total_kbps - audio_kbps - 24.0).max(96.0);
+    let mut last_status = None;
+    for attempt in 1..=5 {
+        let args = target_args(&profile.args, video_kbps, audio_kbps);
+        writeln!(
+            log,
+            "TARGET_ATTEMPT={attempt} TARGET_MB={target_mb} VIDEO_KBPS={video_kbps:.0}"
+        )?;
+        let status = run_ffmpeg_once(config, profile, input, temp, log, args)?;
+        last_status = Some(status);
+        if !status.success() {
+            return Ok(status);
+        }
+        let actual = fs::metadata(temp)
+            .map(|meta| meta.len())
+            .unwrap_or(u64::MAX);
+        if actual <= target_bytes {
+            writeln!(log, "TARGET_RESULT=ok ACTUAL_BYTES={actual}")?;
+            return Ok(status);
+        }
+        let ratio = target_bytes as f64 / actual as f64;
+        video_kbps = (video_kbps * ratio * 0.93).max(64.0);
+    }
+    let actual = fs::metadata(temp).map(|meta| meta.len()).unwrap_or(0);
+    if actual > target_bytes {
+        bail!(
+            "не удалось уложить результат в {target_mb} МБ за 5 проходов (получилось {:.1} МБ)",
+            actual as f64 / 1_000_000.0
+        );
+    }
+    Ok(last_status.expect("target attempts"))
+}
+
+fn run_ffmpeg_once(
+    config: &Config,
+    profile: &Profile,
+    input: &Path,
+    temp: &Path,
+    log: &mut File,
+    args: Vec<String>,
+) -> Result<std::process::ExitStatus> {
+    let selected_args = select_hardware_args(config, profile, &args, log)?;
+    let status = invoke_ffmpeg(config, input, temp, log, &selected_args)?;
+    if status.success()
+        || profile.hardware.is_none()
+        || !config.hardware_fallback
+        || profile.fallback_args.is_empty()
+    {
+        return Ok(status);
+    }
+    writeln!(log, "HARDWARE_FALLBACK=software AFTER_STATUS={status}")?;
+    let fallback_args = if profile.target_size_mb.is_some() {
+        preserve_rate_flags(&profile.fallback_args, &args)
+    } else {
+        profile.fallback_args.clone()
+    };
+    invoke_ffmpeg(config, input, temp, log, &fallback_args)
+}
+
+fn select_hardware_args(
+    config: &Config,
+    profile: &Profile,
+    args: &[String],
+    log: &mut File,
+) -> Result<Vec<String>> {
+    let Some(backend) = profile.hardware.as_ref() else {
+        return Ok(args.to_vec());
+    };
+    if let Some(device) = hardware_device(config, backend) {
+        let selected = if matches!(backend, HardwareBackend::Vaapi) {
+            replace_placeholder(args, "{vaapi_device}", &device)
+        } else {
+            args.to_vec()
+        };
+        writeln!(log, "HARDWARE={} selected DEVICE={device}", backend.label())?;
+        return Ok(selected);
+    }
+    if config.hardware_fallback && !profile.fallback_args.is_empty() {
+        writeln!(
+            log,
+            "HARDWARE_FALLBACK=software BACKEND={} REASON=capability_unavailable",
+            backend.label()
+        )?;
+        return Ok(if profile.target_size_mb.is_some() {
+            preserve_rate_flags(&profile.fallback_args, args)
+        } else {
+            profile.fallback_args.clone()
+        });
+    }
+    bail!(
+        "аппаратный профиль {} недоступен: проверьте encoder и устройство; включите hardware_fallback или исправьте конфигурацию",
+        backend.label()
+    )
+}
+
+fn preserve_rate_flags(base: &[String], requested: &[String]) -> Vec<String> {
+    let mut output = base.to_vec();
+    for flag in ["-b:v", "-maxrate", "-bufsize", "-b:a"] {
+        if let Some(index) = requested.iter().position(|arg| arg == flag) {
+            if let Some(value) = requested.get(index + 1) {
+                output.push(flag.to_string());
+                output.push(value.clone());
+            }
+        }
+    }
+    output
+}
+
+fn hardware_device(config: &Config, backend: &HardwareBackend) -> Option<String> {
+    match backend {
+        HardwareBackend::Vaapi => {
+            let device = std::env::var_os("MEDIA_STUDIO_VAAPI_DEVICE")
+                .map(PathBuf::from)
+                .or_else(|| config.vaapi_device.clone().map(PathBuf::from))
+                .or_else(discover_vaapi_device)?;
+            if !is_render_node(&device) || !ffmpeg_encoder_available("h264_vaapi") {
+                return None;
+            }
+            Some(device.display().to_string())
+        }
+        HardwareBackend::Nvenc => {
+            ffmpeg_encoder_available("h264_nvenc").then(|| "nvidia:nvenc".to_string())
+        }
+    }
+}
+
+pub fn hardware_diagnostics(config: &Config) -> Vec<String> {
+    let vaapi_device = std::env::var_os("MEDIA_STUDIO_VAAPI_DEVICE")
+        .map(PathBuf::from)
+        .or_else(|| config.vaapi_device.clone().map(PathBuf::from))
+        .or_else(discover_vaapi_device);
+    let vaapi = match vaapi_device {
+        Some(device) if is_render_node(&device) && ffmpeg_encoder_available("h264_vaapi") => {
+            format!("vaapi: OK ({})", device.display())
+        }
+        Some(device) => format!(
+            "vaapi: MISSING (device or h264_vaapi unavailable: {})",
+            device.display()
+        ),
+        None => "vaapi: MISSING (render node or h264_vaapi unavailable)".to_string(),
+    };
+    let nvenc = if ffmpeg_encoder_available("h264_nvenc") {
+        "nvenc: OK (h264_nvenc)".to_string()
+    } else {
+        "nvenc: MISSING (h264_nvenc unavailable)".to_string()
+    };
+    vec![vaapi, nvenc]
+}
+
+fn discover_vaapi_device() -> Option<PathBuf> {
+    let mut devices = fs::read_dir("/dev/dri")
+        .ok()?
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .map(|name| name.starts_with("renderD"))
+                .unwrap_or(false)
+        })
+        .filter(|path| is_render_node(path))
+        .collect::<Vec<_>>();
+    devices.sort();
+    devices.into_iter().next()
+}
+
+fn is_render_node(path: &Path) -> bool {
+    let render_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| name.starts_with("renderD"))
+        .unwrap_or(false);
+    render_name
+        && fs::metadata(path)
+            .map(|meta| meta.file_type().is_char_device())
+            .unwrap_or(false)
+}
+
+fn ffmpeg_encoder_available(encoder: &str) -> bool {
+    let Some(ffmpeg) = runtime::optional("ffmpeg") else {
+        return false;
+    };
+    let Ok(output) = Command::new(ffmpeg)
+        .args(["-hide_banner", "-encoders"])
+        .output()
+    else {
+        return false;
+    };
+    if !output.status.success() {
+        return false;
+    }
+    parse_encoder_listing(&String::from_utf8_lossy(&output.stdout), encoder)
+}
+
+fn parse_encoder_listing(listing: &str, encoder: &str) -> bool {
+    listing
+        .lines()
+        .any(|line| line.split_whitespace().any(|token| token == encoder))
+}
+
+fn replace_placeholder(args: &[String], placeholder: &str, value: &str) -> Vec<String> {
+    args.iter()
+        .map(|arg| {
+            if arg == placeholder {
+                value.to_string()
+            } else {
+                arg.clone()
+            }
+        })
+        .collect()
+}
+
+fn invoke_ffmpeg(
+    config: &Config,
+    input: &Path,
+    temp: &Path,
+    log: &mut File,
+    args: &[String],
+) -> Result<std::process::ExitStatus> {
+    let expanded = expanded_args(args, input, temp);
+    let mut command = Command::new(runtime::required("ffmpeg")?);
+    command
+        .args(["-hide_banner", "-nostdin", "-y", "-loglevel", "error", "-i"])
+        .arg(input)
+        .args([
+            "-filter_threads",
+            "1",
+            "-filter_complex_threads",
+            "1",
+            "-threads",
+        ])
+        .arg(config.ffmpeg_threads.to_string())
+        .args(expanded.iter().map(String::as_str));
+    if !args.iter().any(|arg| arg == "{output}") {
+        command.arg(temp);
+    }
+    writeln!(log, "COMMAND=ffmpeg {:?}", command)?;
+    let log_out = log.try_clone()?;
+    let log_err = log.try_clone()?;
+    Ok(command
+        .stdout(Stdio::from(log_out))
+        .stderr(Stdio::from(log_err))
+        .status()?)
+}
+
+fn target_args(base: &[String], video_kbps: f64, audio_kbps: f64) -> Vec<String> {
+    let mut output = Vec::with_capacity(base.len() + 8);
+    let mut index = 0;
+    while index < base.len() {
+        let arg = &base[index];
+        if matches!(arg.as_str(), "-crf" | "-cq" | "-qp") {
+            index += 2;
+            continue;
+        }
+        if arg == "-b:v" {
+            index += 2;
+            continue;
+        }
+        if arg == "-b:a" {
+            output.push(arg.clone());
+            output.push(format!("{audio_kbps:.0}k"));
+            index += 2;
+            continue;
+        }
+        output.push(arg.clone());
+        index += 1;
+    }
+    output.extend([
+        "-b:v".to_string(),
+        format!("{video_kbps:.0}k"),
+        "-maxrate".to_string(),
+        format!("{video_kbps:.0}k"),
+        "-bufsize".to_string(),
+        format!("{:.0}k", video_kbps * 2.0),
+    ]);
+    output
+}
+
+fn probe_duration(input: &Path) -> Result<f64> {
+    let output = Command::new(runtime::required("ffprobe")?)
+        .args([
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+        ])
+        .arg(input)
+        .output()
+        .context("не удалось определить длительность через ffprobe")?;
+    if !output.status.success() {
+        bail!("ffprobe не смог определить длительность");
+    }
+    String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .parse::<f64>()
+        .context("ffprobe вернул некорректную длительность")
+}
+
+fn run_magick(
+    profile: &Profile,
+    input: &Path,
+    temp: &Path,
+    log: &mut File,
+) -> Result<std::process::ExitStatus> {
+    let args = expanded_args(&profile.args, input, temp);
+    let mut command = Command::new(runtime::required("magick")?);
+    if !profile.args.iter().any(|arg| arg == "{input}") {
+        command.arg(input);
+    }
+    command.args(args.iter().map(String::as_str));
+    if !profile.args.iter().any(|arg| arg == "{output}") {
+        command.arg(temp);
+    }
+    writeln!(log, "COMMAND=magick {:?}", command)?;
+    let log_out = log.try_clone()?;
+    let log_err = log.try_clone()?;
+    Ok(command
+        .stdout(Stdio::from(log_out))
+        .stderr(Stdio::from(log_err))
+        .status()?)
+}
+
+fn expanded_args(args: &[String], input: &Path, output: &Path) -> Vec<String> {
+    args.iter()
+        .map(|arg| {
+            arg.replace("{input}", &input.to_string_lossy())
+                .replace("{output}", &output.to_string_lossy())
+        })
+        .collect()
+}
+
+fn verify(profile: &Profile, output: &Path, log: &mut File) -> Result<()> {
+    match profile.engine.as_str() {
+        "ffmpeg" => {
+            let probe = Command::new(runtime::required("ffprobe")?)
+                .args([
+                    "-v",
+                    "error",
+                    "-show_entries",
+                    "format=duration,size",
+                    "-of",
+                    "default=noprint_wrappers=1",
+                ])
+                .arg(output)
+                .output()
+                .context("не удалось запустить ffprobe для проверки")?;
+            log.write_all(&probe.stderr)?;
+            if !probe.status.success() || String::from_utf8_lossy(&probe.stdout).trim().is_empty() {
+                bail!("ffprobe не подтвердил результат: {}", output.display());
+            }
+            let decode = Command::new(runtime::required("ffmpeg")?)
+                .args([
+                    "-hide_banner",
+                    "-nostdin",
+                    "-loglevel",
+                    "error",
+                    "-xerror",
+                    "-i",
+                ])
+                .arg(output)
+                .args(["-map", "0:v?", "-map", "0:a?", "-f", "null", "-"])
+                .output()
+                .context("не удалось запустить полную проверку декодирования")?;
+            log.write_all(&decode.stderr)?;
+            if !decode.status.success() {
+                bail!("полное декодирование результата завершилось с ошибкой");
+            }
+        }
+        "magick" => {
+            let check = Command::new(runtime::required("magick")?)
+                .args(["identify", "-quiet"])
+                .arg(output)
+                .output()
+                .context("не удалось проверить результат ImageMagick")?;
+            log.write_all(&check.stderr)?;
+            if !check.status.success() {
+                bail!("ImageMagick не подтвердил результат: {}", output.display());
+            }
+        }
+        _ => bail!("нельзя проверить неизвестный engine"),
+    }
+    Ok(())
+}
+
+pub fn inspect(input: &Path, json: bool) -> Result<String> {
+    if !input.is_file() {
+        bail!(
+            "файл не найден или это не обычный файл: {}",
+            input.display()
+        );
+    }
+    if json {
+        let output = Command::new(runtime::required("ffprobe")?)
+            .args([
+                "-v",
+                "error",
+                "-show_format",
+                "-show_streams",
+                "-of",
+                "json",
+            ])
+            .arg(input)
+            .output()
+            .context("не удалось запустить ffprobe")?;
+        if output.status.success() {
+            return Ok(String::from_utf8_lossy(&output.stdout).into_owned());
+        }
+    }
+    let output = Command::new(runtime::required("ffprobe")?).args(["-v", "error", "-show_entries", "format=filename,format_name,duration,size:stream=index,codec_type,codec_name,width,height,channels,sample_rate", "-of", "default=noprint_wrappers=1"]).arg(input).output().context("не удалось запустить ffprobe")?;
+    if !output.status.success() {
+        let image = Command::new(runtime::required("magick")?)
+            .args(["identify", "-format", "%m %wx%h %[channels]"])
+            .arg(input)
+            .output()?;
+        if image.status.success() {
+            return Ok(String::from_utf8_lossy(&image.stdout).into_owned());
+        }
+        bail!("не удалось определить формат {}", input.display());
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
+pub fn ensure_tools(profile: Option<&Profile>) -> Result<()> {
+    let mut tools = vec!["ffmpeg", "ffprobe", "systemd-run"];
+    if profile.map(|item| item.engine == "magick").unwrap_or(true) {
+        tools.push("magick");
+    }
+    if runtime::optional("zenity").is_none() && runtime::optional("kdialog").is_none() {
+        bail!("не найден zenity или kdialog для пользовательских окон");
+    }
+    for tool in tools {
+        if runtime::optional(tool).is_none() {
+            bail!(
+                "не найден обязательный инструмент `{tool}`. Установите пакет и повторите запуск."
+            );
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn encoder_listing_requires_exact_encoder_token() {
+        let listing = " V..... h264_vaapi           H.264/AVC (VAAPI)\n V..... h264_nvenc           NVIDIA NVENC H.264 encoder";
+        assert!(parse_encoder_listing(listing, "h264_vaapi"));
+        assert!(parse_encoder_listing(listing, "h264_nvenc"));
+        assert!(!parse_encoder_listing(listing, "h264"));
+    }
+
+    #[test]
+    fn placeholder_replacement_is_exact() {
+        let args = vec![
+            "-vaapi_device".to_string(),
+            "{vaapi_device}".to_string(),
+            "{vaapi_device}-suffix".to_string(),
+        ];
+        let replaced = replace_placeholder(&args, "{vaapi_device}", "/dev/dri/renderD129");
+        assert_eq!(replaced[1], "/dev/dri/renderD129");
+        assert_eq!(replaced[2], "{vaapi_device}-suffix");
+    }
+
+    #[test]
+    fn target_fallback_preserves_rate_flags() {
+        let software = vec!["-c:v".to_string(), "libx264".to_string()];
+        let requested = vec![
+            "-c:v".to_string(),
+            "h264_nvenc".to_string(),
+            "-b:v".to_string(),
+            "900k".to_string(),
+            "-maxrate".to_string(),
+            "900k".to_string(),
+            "-bufsize".to_string(),
+            "1800k".to_string(),
+            "-b:a".to_string(),
+            "128k".to_string(),
+        ];
+        let fallback = preserve_rate_flags(&software, &requested);
+        assert!(fallback.windows(2).any(|pair| pair == ["-b:v", "900k"]));
+        assert!(fallback.windows(2).any(|pair| pair == ["-maxrate", "900k"]));
+        assert!(fallback
+            .windows(2)
+            .any(|pair| pair == ["-bufsize", "1800k"]));
+        assert!(fallback.windows(2).any(|pair| pair == ["-b:a", "128k"]));
+    }
+}
+
+--- END src/engine.rs ---
+[bound full-file sha256: 1c032309f316b41f199593d5a90584f83e7f7f1b83f4ac506b7026f2459d832a]
+
+--- BEGIN src/model.rs (full file) ---
+use anyhow::{Context, Result};
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+use std::fs;
+use std::path::Path;
+
+const CURRENT_SCHEMA: u32 = 2;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Config {
+    pub schema: u32,
+    pub default_profile: String,
+    pub verify_results: bool,
+    pub ffmpeg_threads: u32,
+    #[serde(default = "default_true")]
+    pub hardware_fallback: bool,
+    #[serde(default)]
+    pub vaapi_device: Option<String>,
+    #[serde(default)]
+    pub profiles: BTreeMap<String, Profile>,
+    #[serde(default)]
+    pub watch_folders: Vec<WatchFolder>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Profile {
+    pub label: String,
+    pub category: String,
+    pub engine: String,
+    #[serde(default)]
+    pub extension: String,
+    pub suffix: String,
+    #[serde(default)]
+    pub args: Vec<String>,
+    #[serde(default)]
+    pub target_size_mb: Option<u64>,
+    #[serde(default)]
+    pub target_audio_bitrate_kbps: u32,
+    #[serde(default)]
+    pub hardware: Option<HardwareBackend>,
+    #[serde(default)]
+    pub fallback_args: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum HardwareBackend {
+    Vaapi,
+    Nvenc,
+}
+
+impl HardwareBackend {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Self::Vaapi => "VAAPI",
+            Self::Nvenc => "NVENC",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WatchFolder {
+    pub id: String,
+    pub source: String,
+    pub destination: String,
+    pub profile: String,
+    #[serde(default = "default_true")]
+    pub recursive: bool,
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_settle_seconds")]
+    pub settle_seconds: u64,
+}
+
+impl Config {
+    pub fn built_in() -> Self {
+        let mut profiles = BTreeMap::new();
+
+        add(
+            &mut profiles,
+            "video_mp4",
+            "Видео → MP4 (H.264)",
+            "Видео",
+            "ffmpeg",
+            "mp4",
+            "mp4",
+            vec![
+                "-map",
+                "0:v:0",
+                "-map",
+                "0:a?",
+                "-map_metadata",
+                "0",
+                "-sn",
+                "-dn",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "medium",
+                "-crf",
+                "23",
+                "-pix_fmt",
+                "yuv420p",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "160k",
+                "-movflags",
+                "+faststart",
+            ],
+        );
+        add(
+            &mut profiles,
+            "video_mp4_hq",
+            "Видео → MP4 (H.264 HQ)",
+            "Видео",
+            "ffmpeg",
+            "mp4",
+            "hq",
+            vec![
+                "-map",
+                "0:v:0",
+                "-map",
+                "0:a?",
+                "-map_metadata",
+                "0",
+                "-sn",
+                "-dn",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "slow",
+                "-crf",
+                "18",
+                "-pix_fmt",
+                "yuv420p",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "192k",
+                "-movflags",
+                "+faststart",
+            ],
+        );
+        add(
+            &mut profiles,
+            "video_mp4_h265",
+            "Видео → MP4 (H.265)",
+            "Видео",
+            "ffmpeg",
+            "mp4",
+            "h265",
+            vec![
+                "-map",
+                "0:v:0",
+                "-map",
+                "0:a?",
+                "-map_metadata",
+                "0",
+                "-sn",
+                "-dn",
+                "-c:v",
+                "libx265",
+                "-preset",
+                "medium",
+                "-crf",
+                "27",
+                "-pix_fmt",
+                "yuv420p",
+                "-tag:v",
+                "hvc1",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "160k",
+                "-movflags",
+                "+faststart",
+            ],
+        );
+
+        add(
+            &mut profiles,
+            "video_mp4_400mb",
+            "Видео → MP4 (до 400 МБ)",
+            "Сжатие",
+            "ffmpeg",
+            "mp4",
+            "400mb",
+            vec![
+                "-map",
+                "0:v:0",
+                "-map",
+                "0:a?",
+                "-map_metadata",
+                "0",
+                "-sn",
+                "-dn",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "medium",
+                "-pix_fmt",
+                "yuv420p",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "128k",
+                "-movflags",
+                "+faststart",
+            ],
+        );
+        profiles
+            .get_mut("video_mp4_400mb")
+            .expect("profile")
+            .target_size_mb = Some(400);
+        profiles
+            .get_mut("video_mp4_400mb")
+            .expect("profile")
+            .target_audio_bitrate_kbps = 128;
+
+        add(
+            &mut profiles,
+            "video_mp4_max_400mb",
+            "Видео → MP4 (сильное сжатие, до 400 МБ)",
+            "Сжатие",
+            "ffmpeg",
+            "mp4",
+            "max-400mb",
+            vec![
+                "-map",
+                "0:v:0",
+                "-map",
+                "0:a?",
+                "-map_metadata",
+                "0",
+                "-sn",
+                "-dn",
+                "-c:v",
+                "libx264",
+                "-preset",
+                "slow",
+                "-pix_fmt",
+                "yuv420p",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "96k",
+                "-movflags",
+                "+faststart",
+            ],
+        );
+        profiles
+            .get_mut("video_mp4_max_400mb")
+            .expect("profile")
+            .target_size_mb = Some(400);
+        profiles
+            .get_mut("video_mp4_max_400mb")
+            .expect("profile")
+            .target_audio_bitrate_kbps = 96;
+
+        add(
+            &mut profiles,
+            "video_webm_av1",
+            "Видео → WebM (AV1/Opus)",
+            "Видео",
+            "ffmpeg",
+            "webm",
+            "av1",
+            vec![
+                "-map",
+                "0:v:0",
+                "-map",
+                "0:a?",
+                "-map_metadata",
+                "0",
+                "-sn",
+                "-dn",
+                "-c:v",
+                "libsvtav1",
+                "-crf",
+                "35",
+                "-preset",
+                "6",
+                "-c:a",
+                "libopus",
+                "-b:a",
+                "128k",
+            ],
+        );
+
+        add(
+            &mut profiles,
+            "video_mp4_vaapi",
+            "Видео → MP4 (VAAPI)",
+            "Аппаратное ускорение",
+            "ffmpeg",
+            "mp4",
+            "vaapi",
+            vec![
+                "-map",
+                "0:v:0",
+                "-map",
+                "0:a?",
+                "-map_metadata",
+                "0",
+                "-sn",
+                "-dn",
+                "-vaapi_device",
+                "{vaapi_device}",
+                "-vf",
+                "format=nv12,hwupload",
+                "-c:v",
+                "h264_vaapi",
+                "-qp",
+                "23",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "160k",
+                "-movflags",
+                "+faststart",
+            ],
+        );
+        profiles
+            .get_mut("video_mp4_vaapi")
+            .expect("profile")
+            .hardware = Some(HardwareBackend::Vaapi);
+        profiles
+            .get_mut("video_mp4_vaapi")
+            .expect("profile")
+            .fallback_args = profiles
+            .get("video_mp4")
+            .expect("software profile")
+            .args
+            .clone();
+
+        add(
+            &mut profiles,
+            "video_mp4_nvenc",
+            "Видео → MP4 (NVENC)",
+            "Аппаратное ускорение",
+            "ffmpeg",
+            "mp4",
+            "nvenc",
+            vec![
+                "-map",
+                "0:v:0",
+                "-map",
+                "0:a?",
+                "-map_metadata",
+                "0",
+                "-sn",
+                "-dn",
+                "-c:v",
+                "h264_nvenc",
+                "-preset",
+                "p5",
+                "-cq",
+                "23",
+                "-pix_fmt",
+                "yuv420p",
+                "-c:a",
+                "aac",
+                "-b:a",
+                "160k",
+                "-movflags",
+                "+faststart",
+            ],
+        );
+        profiles
+            .get_mut("video_mp4_nvenc")
+            .expect("profile")
+            .hardware = Some(HardwareBackend::Nvenc);
+        profiles
+            .get_mut("video_mp4_nvenc")
+            .expect("profile")
+            .fallback_args = profiles
+            .get("video_mp4")
+            .expect("software profile")
+            .args
+            .clone();
+
+        add(
+            &mut profiles,
+            "audio_opus",
+            "Аудио → Opus",
+            "Аудио",
+            "ffmpeg",
+            "opus",
+            "opus",
+            vec![
+                "-vn",
+                "-map",
+                "0:a:0",
+                "-map_metadata",
+                "0",
+                "-c:a",
+                "libopus",
+                "-b:a",
+                "128k",
+                "-vbr",
+                "on",
+                "-compression_level",
+                "10",
+            ],
+        );
+        add(
+            &mut profiles,
+            "audio_mp3",
+            "Аудио → MP3",
+            "Аудио",
+            "ffmpeg",
+            "mp3",
+            "mp3",
+            vec![
+                "-vn",
+                "-map",
+                "0:a:0",
+                "-map_metadata",
+                "0",
+                "-c:a",
+                "libmp3lame",
+                "-q:a",
+                "2",
+            ],
+        );
+        add(
+            &mut profiles,
+            "audio_flac",
+            "Аудио → FLAC",
+            "Аудио",
+            "ffmpeg",
+            "flac",
+            "flac",
+            vec!["-vn", "-map", "0:a:0", "-map_metadata", "0", "-c:a", "flac"],
+        );
+        add(
+            &mut profiles,
+            "extract_audio_opus",
+            "Извлечь аудио → Opus",
+            "Извлечение",
+            "ffmpeg",
+            "opus",
+            "audio",
+            vec![
+                "-vn", "-map", "0:a:0", "-c:a", "libopus", "-b:a", "128k", "-vbr", "on",
+            ],
+        );
+        add(
+            &mut profiles,
+            "remux_mkv",
+            "Контейнер → MKV (без перекодирования)",
+            "Контейнер",
+            "ffmpeg",
+            "mkv",
+            "remux",
+            vec!["-map", "0", "-map_metadata", "0", "-c", "copy"],
+        );
+        add(
+            &mut profiles,
+            "strip_audio",
+            "Видео без аудио",
+            "Видео",
+            "ffmpeg",
+            "",
+            "no-audio",
+            vec!["-map", "0", "-map", "-0:a", "-c", "copy"],
+        );
+        add(
+            &mut profiles,
+            "image_webp",
+            "Изображение → WebP",
+            "Изображения",
+            "magick",
+            "webp",
+            "webp",
+            vec!["-strip", "-quality", "85"],
+        );
+        add(
+            &mut profiles,
+            "image_jpeg",
+            "Изображение → JPEG",
+            "Изображения",
+            "magick",
+            "jpg",
+            "jpg",
+            vec!["-strip", "-quality", "92"],
+        );
+        add(
+            &mut profiles,
+            "image_avif",
+            "Изображение → AVIF",
+            "Изображения",
+            "magick",
+            "avif",
+            "avif",
+            vec!["-strip", "-quality", "75"],
+        );
+        add(
+            &mut profiles,
+            "image_resize_1080",
+            "Изображение → максимум 1920×1080",
+            "Изображения",
+            "magick",
+            "",
+            "1080p",
+            vec!["-strip", "-resize", "1920x1080>"],
+        );
+
+        Self {
+            schema: CURRENT_SCHEMA,
+            default_profile: "video_mp4".to_string(),
+            verify_results: true,
+            ffmpeg_threads: 4,
+            hardware_fallback: true,
+            vaapi_device: None,
+            profiles,
+            watch_folders: Vec::new(),
+        }
+    }
+
+    pub fn load(path: &Path) -> Result<Self> {
+        if !path.exists() {
+            return Ok(Self::built_in());
+        }
+        let text = fs::read_to_string(path)
+            .with_context(|| format!("не удалось прочитать конфигурацию {}", path.display()))?;
+        let mut config: Self = toml::from_str(&text)
+            .with_context(|| format!("ошибка TOML в конфигурации {}", path.display()))?;
+        config.upgrade();
+        config.validate()?;
+        Ok(config)
+    }
+
+    pub fn write(&self, path: &Path) -> Result<()> {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        let text = toml::to_string_pretty(self)?;
+        fs::write(path, text).with_context(|| format!("не удалось записать {}", path.display()))?;
+        Ok(())
+    }
+
+    pub fn upgrade(&mut self) {
+        if self.schema >= CURRENT_SCHEMA {
+            return;
+        }
+        let defaults = Self::built_in();
+        for (id, profile) in defaults.profiles {
+            self.profiles.entry(id).or_insert(profile);
+        }
+        self.hardware_fallback = true;
+        if self.vaapi_device.is_none() {
+            self.vaapi_device = defaults.vaapi_device;
+        }
+        self.schema = CURRENT_SCHEMA;
+    }
+
+    pub fn validate(&self) -> Result<()> {
+        anyhow::ensure!(
+            self.schema == CURRENT_SCHEMA,
+            "неподдерживаемая версия конфигурации: {}",
+            self.schema
+        );
+        anyhow::ensure!(
+            self.ffmpeg_threads > 0,
+            "ffmpeg_threads должен быть больше нуля"
+        );
+        anyhow::ensure!(
+            self.profiles.contains_key(&self.default_profile),
+            "default_profile не найден: {}",
+            self.default_profile
+        );
+        if let Some(device) = &self.vaapi_device {
+            anyhow::ensure!(
+                Path::new(device).is_absolute(),
+                "vaapi_device должен быть абсолютным путём: {device}"
+            );
+        }
+        for (id, profile) in &self.profiles {
+            anyhow::ensure!(!id.trim().is_empty(), "пустой идентификатор профиля");
+            anyhow::ensure!(
+                !profile.label.trim().is_empty(),
+                "пустая метка профиля {id}"
+            );
+            anyhow::ensure!(
+                matches!(profile.engine.as_str(), "ffmpeg" | "magick"),
+                "неподдерживаемый engine у профиля {id}: {}",
+                profile.engine
+            );
+            if let Some(size) = profile.target_size_mb {
+                anyhow::ensure!(
+                    size > 0,
+                    "target_size_mb должен быть больше нуля у профиля {id}"
+                );
+            }
+        }
+        for folder in &self.watch_folders {
+            anyhow::ensure!(
+                valid_watch_id(&folder.id),
+                "некорректный id watch-folder: {}",
+                folder.id
+            );
+            anyhow::ensure!(
+                self.profiles.contains_key(&folder.profile),
+                "watch-folder {} ссылается на неизвестный профиль {}",
+                folder.id,
+                folder.profile
+            );
+        }
+        Ok(())
+    }
+}
+
+pub fn valid_watch_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 64
+        && id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+}
+
+#[allow(clippy::too_many_arguments)]
+fn add(
+    profiles: &mut BTreeMap<String, Profile>,
+    id: &str,
+    label: &str,
+    category: &str,
+    engine: &str,
+    extension: &str,
+    suffix: &str,
+    args: Vec<&str>,
+) {
+    profiles.insert(
+        id.to_string(),
+        Profile {
+            label: label.to_string(),
+            category: category.to_string(),
+            engine: engine.to_string(),
+            extension: extension.to_string(),
+            suffix: suffix.to_string(),
+            args: args.into_iter().map(str::to_string).collect(),
+            target_size_mb: None,
+            target_audio_bitrate_kbps: 128,
+            hardware: None,
+            fallback_args: Vec::new(),
+        },
+    );
+}
+
+fn default_true() -> bool {
+    true
+}
+fn default_settle_seconds() -> u64 {
+    3
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn built_in_profiles_cover_requested_features() {
+        let config = Config::built_in();
+        assert_eq!(config.schema, CURRENT_SCHEMA);
+        assert_eq!(config.profiles["video_mp4_400mb"].target_size_mb, Some(400));
+        assert!(matches!(
+            config.profiles["video_mp4_vaapi"].hardware,
+            Some(HardwareBackend::Vaapi)
+        ));
+        assert!(matches!(
+            config.profiles["video_mp4_nvenc"].hardware,
+            Some(HardwareBackend::Nvenc)
+        ));
+        assert!(config.profiles["video_mp4_vaapi"]
+            .args
+            .windows(2)
+            .any(|pair| pair == ["-vaapi_device", "{vaapi_device}"]));
+    }
+
+    #[test]
+    fn watch_ids_are_safe_for_unit_names() {
+        assert!(valid_watch_id("camera_01"));
+        assert!(valid_watch_id("archive-2026"));
+        assert!(!valid_watch_id("../escape"));
+        assert!(!valid_watch_id("with space"));
+        assert!(!valid_watch_id(""));
+    }
+}
+
+--- END src/model.rs ---
+[bound full-file sha256: f22d26697668902690aaaac82540cbd5747bd7a82bb0d2f1d0cfb0ed26a50a17]
+
+--- BEGIN src/paths.rs (full file) ---
+use anyhow::{Context, Result};
+use std::env;
+use std::ffi::OsStr;
+use std::fs;
+use std::path::{Path, PathBuf};
+
+use crate::model::Profile;
+
+pub fn home_dir() -> PathBuf {
+    env::var_os("HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| env::current_dir().unwrap_or_else(|_| PathBuf::from(".")))
+}
+
+pub fn config_path() -> PathBuf {
+    env::var_os("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| home_dir().join(".config"))
+        .join("media-studio/config.toml")
+}
+
+pub fn state_dir() -> PathBuf {
+    env::var_os("XDG_STATE_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| home_dir().join(".local/state"))
+        .join("media-studio")
+}
+
+pub fn installed_binary_path() -> PathBuf {
+    home_dir().join(".local/bin/media-studio")
+}
+
+pub fn service_menu_dir() -> PathBuf {
+    env::var_os("XDG_DATA_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| home_dir().join(".local/share"))
+        .join("kio/servicemenus")
+}
+
+pub fn service_menu_paths() -> Vec<PathBuf> {
+    [
+        "media-studio-video.desktop",
+        "media-studio-audio.desktop",
+        "media-studio-image.desktop",
+    ]
+    .into_iter()
+    .map(|name| service_menu_dir().join(name))
+    .collect()
+}
+
+pub fn legacy_service_menu_path() -> PathBuf {
+    service_menu_dir().join("media-studio.desktop")
+}
+
+pub fn systemd_user_dir() -> PathBuf {
+    env::var_os("XDG_CONFIG_HOME")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| home_dir().join(".config"))
+        .join("systemd/user")
+}
+
+pub fn watch_service_path(id: &str) -> PathBuf {
+    systemd_user_dir().join(format!("media-studio-watch-{id}.service"))
+}
+
+pub fn valid_job_id(id: &str) -> bool {
+    !id.is_empty()
+        && id.len() <= 96
+        && id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+}
+
+pub fn normalize_path_arg(raw: &str) -> PathBuf {
+    let decoded = raw
+        .strip_prefix("file://")
+        .map(|rest| rest.strip_prefix("localhost").unwrap_or(rest));
+    match decoded {
+        Some(value) => PathBuf::from(percent_decode(value)),
+        None => PathBuf::from(raw),
+    }
+}
+
+pub fn percent_decode(input: &str) -> String {
+    let bytes = input.as_bytes();
+    let mut output = Vec::with_capacity(bytes.len());
+    let mut index = 0;
+    while index < bytes.len() {
+        if bytes[index] == b'%' && index + 2 < bytes.len() {
+            if let (Some(high), Some(low)) =
+                (hex_value(bytes[index + 1]), hex_value(bytes[index + 2]))
+            {
+                output.push((high << 4) | low);
+                index += 3;
+                continue;
+            }
+        }
+        output.push(bytes[index]);
+        index += 1;
+    }
+    String::from_utf8_lossy(&output).into_owned()
+}
+
+fn hex_value(byte: u8) -> Option<u8> {
+    match byte {
+        b'0'..=b'9' => Some(byte - b'0'),
+        b'a'..=b'f' => Some(byte - b'a' + 10),
+        b'A'..=b'F' => Some(byte - b'A' + 10),
+        _ => None,
+    }
+}
+
+pub fn output_path(
+    input: &Path,
+    profile: &Profile,
+    output_dir: Option<&Path>,
+    overwrite: bool,
+) -> PathBuf {
+    let parent = output_dir.unwrap_or_else(|| input.parent().unwrap_or_else(|| Path::new(".")));
+    let stem = input.file_stem().and_then(OsStr::to_str).unwrap_or("media");
+    let source_ext = input
+        .extension()
+        .and_then(OsStr::to_str)
+        .unwrap_or("bin")
+        .to_ascii_lowercase();
+    let extension = if profile.extension.is_empty() {
+        source_ext.clone()
+    } else {
+        profile.extension.clone()
+    };
+    let primary = parent.join(format!("{stem}.{extension}"));
+    if !overwrite && primary != input && !primary.exists() {
+        return primary;
+    }
+    if overwrite && primary != input {
+        return primary;
+    }
+    let suffix = if profile.suffix.is_empty()
+        || profile.suffix.eq_ignore_ascii_case(&extension)
+        || profile.suffix.eq_ignore_ascii_case(&source_ext)
+    {
+        "converted"
+    } else {
+        &profile.suffix
+    };
+    for index in 1..10_000u32 {
+        let candidate = parent.join(format!("{stem}.{suffix}-{index}.{extension}"));
+        if overwrite || !candidate.exists() {
+            return candidate;
+        }
+    }
+    parent.join(format!("{stem}.{suffix}-overflow.{extension}"))
+}
+
+pub fn job_log_path(job_id: &str) -> PathBuf {
+    state_dir().join("jobs").join(format!("{job_id}.log"))
+}
+
+pub fn job_status_path(job_id: &str) -> PathBuf {
+    state_dir().join("jobs").join(format!("{job_id}.status"))
+}
+
+pub fn write_job_status(job_id: &str, state: &str, details: &[(&str, String)]) -> Result<()> {
+    let path = job_status_path(job_id);
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let mut body = format!("state={state}\n");
+    for (key, value) in details {
+        body.push_str(key);
+        body.push('=');
+        body.push_str(value);
+        body.push('\n');
+    }
+    atomic_write(&path, body.as_bytes())
+}
+
+pub fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let temp = path.with_extension(format!("{}.tmp", std::process::id()));
+    fs::write(&temp, bytes)
+        .with_context(|| format!("не удалось записать временный файл {}", temp.display()))?;
+    fs::rename(&temp, path).with_context(|| format!("не удалось заменить {}", path.display()))?;
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::Config;
+
+    #[test]
+    fn file_url_is_decoded() {
+        assert_eq!(
+            normalize_path_arg("file:///tmp/with%20space.mkv"),
+            PathBuf::from("/tmp/with space.mkv")
+        );
+    }
+
+    #[test]
+    fn output_path_does_not_equal_input() {
+        let profile = Config::built_in()
+            .profiles
+            .get("video_mp4")
+            .cloned()
+            .expect("profile");
+        let input = PathBuf::from("/tmp/example.mp4");
+        assert_ne!(output_path(&input, &profile, None, false), input);
+    }
+}
+
+--- END src/paths.rs ---
+[bound full-file sha256: 228be0d72373fe9ceccaeea10e38a1bd9d352735df5b75dd2f78c5b5d778d22c]
+
+--- BEGIN src/queue.rs (full file) ---
+use anyhow::{bail, Context, Result};
+use std::path::Path;
+use std::process::{Command, Stdio};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use crate::runtime;
+use crate::{paths, ui};
+
+pub struct EnqueueRequest<'a> {
+    pub executable: &'a Path,
+    pub profile: &'a str,
+    pub target_size_mb: Option<u64>,
+    pub hardware_fallback: bool,
+    pub vaapi_device: Option<&'a str>,
+    pub output_dir: Option<std::path::PathBuf>,
+    pub overwrite: bool,
+    pub files: &'a [String],
+}
+
+pub fn enqueue(request: EnqueueRequest<'_>) -> Result<String> {
+    if request.files.is_empty() {
+        bail!("в Dolphin ничего не выбрано. Выберите хотя бы один медиафайл.");
+    }
+    let job_id = new_job_id();
+    let unit = format!("media-studio-{job_id}.service");
+    let mut command = Command::new(runtime::required("systemd-run")?);
+    command
+        .args([
+            "--user",
+            "--collect",
+            "--unit",
+            &unit,
+            "--description",
+            "Media Studio conversion",
+            "--nice",
+            "5",
+            "--no-block",
+            "--quiet",
+        ])
+        .args(vaapi_environment_arg(request.vaapi_device))
+        .arg(request.executable)
+        .args([
+            "run",
+            "--job-id",
+            &job_id,
+            "--profile",
+            request.profile,
+            "--hardware-fallback",
+            &request.hardware_fallback.to_string(),
+        ])
+        .args(
+            request
+                .target_size_mb
+                .map(|value| vec!["--target-size-mb".to_string(), value.to_string()])
+                .unwrap_or_default(),
+        )
+        .args(
+            request
+                .output_dir
+                .map(|value| vec!["--output-dir".to_string(), value.display().to_string()])
+                .unwrap_or_default(),
+        )
+        .args(if request.overwrite {
+            vec!["--overwrite".to_string()]
+        } else {
+            Vec::new()
+        })
+        .arg("--")
+        .args(request.files)
+        .stdout(Stdio::null())
+        .stderr(Stdio::piped());
+    let output = command
+        .output()
+        .context("не удалось поставить задачу в user-systemd очередь")?;
+    if !output.status.success() {
+        let details = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        bail!("systemd не принял задачу {job_id}: {details}");
+    }
+    ui::notify(
+        "Media Studio",
+        &format!(
+            "Задача {job_id} добавлена в очередь: {} файл(ов)",
+            request.files.len()
+        ),
+    );
+    Ok(job_id)
+}
+
+pub fn list() -> Result<String> {
+    let output = Command::new(runtime::required("systemctl")?)
+        .args([
+            "--user",
+            "list-units",
+            "--all",
+            "--no-legend",
+            "media-studio-*.service",
+        ])
+        .output()
+        .context("не удалось прочитать очередь Media Studio")?;
+    if !output.status.success() {
+        bail!(
+            "systemctl завершился с ошибкой: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        );
+    }
+    let text = String::from_utf8_lossy(&output.stdout)
+        .lines()
+        .filter(|line| is_conversion_unit(line.split_whitespace().next().unwrap_or_default()))
+        .collect::<Vec<_>>()
+        .join("\n");
+    Ok(if text.is_empty() {
+        "Очередь Media Studio пуста.".to_string()
+    } else {
+        text
+    })
+}
+
+pub fn cancel(job_id: &str) -> Result<()> {
+    let normalized = job_id.strip_suffix(".service").unwrap_or(job_id);
+    let normalized = normalized
+        .strip_prefix("media-studio-")
+        .unwrap_or(normalized);
+    anyhow::ensure!(
+        !normalized.starts_with("watch-"),
+        "watch-folder unit нельзя отменить через queue; используйте `media-studio watch stop --id ID`"
+    );
+    anyhow::ensure!(
+        paths::valid_job_id(normalized),
+        "некорректный идентификатор задачи"
+    );
+    let unit = format!("media-studio-{normalized}.service");
+    let output = Command::new(runtime::required("systemctl")?)
+        .args(["--user", "stop", &unit])
+        .output()
+        .context("не удалось остановить задачу")?;
+    if !output.status.success() {
+        bail!(
+            "не удалось остановить {unit}: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        );
+    }
+    ui::notify("Media Studio", &format!("Задача {unit} остановлена."));
+    Ok(())
+}
+
+fn new_job_id() -> String {
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
+    format!("{}-{}", nanos, std::process::id())
+}
+
+fn is_conversion_unit(unit: &str) -> bool {
+    unit.starts_with("media-studio-") && !unit.starts_with("media-studio-watch-")
+}
+
+fn vaapi_environment_arg(device: Option<&str>) -> Option<String> {
+    device.map(|device| format!("--setenv=MEDIA_STUDIO_VAAPI_DEVICE={device}"))
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn queue_filter_excludes_watch_units() {
+        assert!(super::is_conversion_unit("media-studio-123-456.service"));
+        assert!(!super::is_conversion_unit(
+            "media-studio-watch-camera.service"
+        ));
+    }
+
+    #[test]
+    fn queue_vaapi_environment_argument_is_exact() {
+        assert_eq!(
+            super::vaapi_environment_arg(Some("/dev/dri/renderD128")),
+            Some("--setenv=MEDIA_STUDIO_VAAPI_DEVICE=/dev/dri/renderD128".to_string())
+        );
+        assert_eq!(super::vaapi_environment_arg(None), None);
+    }
+}
+
+--- END src/queue.rs ---
+[bound full-file sha256: 1cff92aed8581b1ad3e989b7f4dff4224b72b968a43a771c24310012da074170]
+
+--- BEGIN src/ui.rs (full file) ---
+use anyhow::{bail, Context, Result};
+use std::process::{Command, Stdio};
+
+use crate::model::Config;
+use crate::runtime;
+
+#[derive(Debug, Clone)]
+pub struct AdvancedSelection {
+    pub profile: String,
+    pub target_size_mb: Option<u64>,
+    pub overwrite: bool,
+    pub hardware_fallback: bool,
+}
+
+pub fn notify(title: &str, body: &str) {
+    if let Some(notify_send) = runtime::optional("notify-send") {
+        let notify_status = Command::new(notify_send)
+            .arg("--app-name=Media Studio")
+            .arg(title)
+            .arg(body)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+        if notify_status
+            .map(|status| status.success())
+            .unwrap_or(false)
+        {
+            return;
+        }
+    }
+    if let Some(kdialog) = runtime::optional("kdialog") {
+        let _ = Command::new(kdialog)
+            .args(["--title", title, "--passivepopup", body, "5"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+}
+
+pub fn error(title: &str, body: &str) {
+    eprintln!("{title}: {body}");
+    notify(title, body);
+}
+
+pub fn choose_advanced(config: &Config) -> Result<AdvancedSelection> {
+    if runtime::optional("zenity").is_some() {
+        return choose_with_zenity(config);
+    }
+    choose_with_kdialog(config)
+}
+
+fn choose_with_zenity(config: &Config) -> Result<AdvancedSelection> {
+    let values = config
+        .profiles
+        .iter()
+        .map(|(id, profile)| format!("{id} — {} / {}", profile.category, profile.label))
+        .collect::<Vec<_>>();
+    let first = values
+        .first()
+        .cloned()
+        .unwrap_or_else(|| config.default_profile.clone());
+    let profile_values = values.join("|");
+    let output = Command::new(runtime::required("zenity")?)
+        .args([
+            "--forms",
+            "--title",
+            "Media Studio — расширенные настройки",
+            "--text",
+            "Выберите профиль и параметры задания",
+            "--separator",
+            "|",
+            "--width",
+            "720",
+            "--height",
+            "420",
+            "--add-combo",
+            "Профиль",
+            "--combo-values",
+            &profile_values,
+            "--add-entry",
+            "Целевой размер, МБ (пусто — без ограничения)",
+            "--add-checkbox",
+            "Перезаписывать существующий файл",
+            "--add-checkbox",
+            "Software fallback для VAAPI/NVENC",
+        ])
+        .output()
+        .context("не удалось открыть расширенное окно Zenity")?;
+    if !output.status.success() {
+        bail!("Операция отменена: профиль не выбран.");
+    }
+    let fields = String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .split('|')
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    let selected = fields.first().cloned().unwrap_or(first);
+    let profile = selected
+        .split(" — ")
+        .next()
+        .unwrap_or(&selected)
+        .to_string();
+    if !config.profiles.contains_key(&profile) {
+        bail!("Диалог вернул неизвестный профиль: {profile}");
+    }
+    let target_size_mb = fields
+        .get(1)
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .filter(|value| *value > 0);
+    let overwrite = fields
+        .get(2)
+        .map(|value| value.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
+    let hardware_fallback = fields
+        .get(3)
+        .map(|value| value.eq_ignore_ascii_case("true"))
+        .unwrap_or(config.hardware_fallback);
+    Ok(AdvancedSelection {
+        profile,
+        target_size_mb,
+        overwrite,
+        hardware_fallback,
+    })
+}
+
+fn choose_with_kdialog(config: &Config) -> Result<AdvancedSelection> {
+    let mut args = vec![
+        "--title",
+        "Media Studio — расширенные настройки",
+        "--menu",
+        "Выберите профиль конвертации",
+    ];
+    let mut owned = Vec::new();
+    for (id, profile) in &config.profiles {
+        owned.push(id.clone());
+        owned.push(format!("{} — {}", profile.category, profile.label));
+    }
+    for value in &owned {
+        args.push(value);
+    }
+    let output = Command::new(runtime::required("kdialog")?)
+        .args(args)
+        .output()
+        .context("не удалось открыть диалог выбора профиля")?;
+    if !output.status.success() {
+        bail!("Операция отменена: профиль не выбран.");
+    }
+    let profile = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if profile.is_empty() || !config.profiles.contains_key(&profile) {
+        bail!("Диалог вернул неизвестный профиль: {profile}");
+    }
+    let target_size_mb = kdialog_inputbox("Целевой размер, МБ (пусто — без ограничения)", "")?
+        .trim()
+        .parse::<u64>()
+        .ok()
+        .filter(|value| *value > 0);
+    let overwrite = kdialog_yesno("Перезаписать существующие результаты?")?;
+    let hardware_fallback = kdialog_yesno("Разрешить software fallback для VAAPI/NVENC?")?;
+    Ok(AdvancedSelection {
+        profile,
+        target_size_mb,
+        overwrite,
+        hardware_fallback,
+    })
+}
+
+fn kdialog_inputbox(prompt: &str, initial: &str) -> Result<String> {
+    let output = Command::new(runtime::required("kdialog")?)
+        .args([
+            "--title",
+            "Media Studio — расширенные настройки",
+            "--inputbox",
+            prompt,
+            initial,
+        ])
+        .output()
+        .context("не удалось открыть поле ввода KDialog")?;
+    if !output.status.success() {
+        bail!("Операция отменена пользователем.");
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+fn kdialog_yesno(prompt: &str) -> Result<bool> {
+    let status = Command::new(runtime::required("kdialog")?)
+        .args([
+            "--title",
+            "Media Studio — расширенные настройки",
+            "--yesno",
+            prompt,
+        ])
+        .status()
+        .context("не удалось открыть подтверждение KDialog")?;
+    if status.code() == Some(1) {
+        return Ok(false);
+    }
+    if status.success() {
+        return Ok(true);
+    }
+    bail!("Операция отменена пользователем.");
+}
+
+pub fn show_info(title: &str, body: &str) {
+    if let Some(zenity) = runtime::optional("zenity") {
+        let _ = Command::new(zenity)
+            .args(["--info", "--title", title, "--text", body, "--width", "760"])
+            .status();
+    } else if let Some(kdialog) = runtime::optional("kdialog") {
+        let _ = Command::new(kdialog)
+            .args(["--title", title, "--msgbox", body])
+            .status();
+    }
+}
+
+--- END src/ui.rs ---
+[bound full-file sha256: 28e414f7b3b0f8c56353ab61c99fc0c1e114a7f398901b1b65ffe97547730c45]
+
+--- BEGIN src/runtime.rs (full file) ---
+use anyhow::{Context, Result};
+use std::path::PathBuf;
+
+pub fn required(name: &str) -> Result<PathBuf> {
+    which::which(name).with_context(|| {
+        format!(
+            "не найден обязательный инструмент `{name}` в PATH; установите пакет и повторите запуск"
+        )
+    })
+}
+
+pub fn optional(name: &str) -> Option<PathBuf> {
+    which::which(name).ok()
+}
+
+--- END src/runtime.rs ---
+[bound full-file sha256: 10536beb3e1291ab05f21958c1b57c2faeab07ec8bdf3ca6261ce9910f3bdfb4]
+
+--- BEGIN .github/workflows/ci.yml (full file) ---
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
+      - run: cargo build --release
+
+  kde-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - name: Install KDE and media dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes dbus-x11 dolphin ffmpeg imagemagick kio-extras xvfb zenity
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release
+      - name: Verify installed Dolphin consumer and conversion
+        shell: bash
+        run: |
+          set -euo pipefail
+          proof_dir="$(mktemp -d)"
+          mkdir -p "$proof_dir/in" "$proof_dir/out" "$proof_dir/home"
+          ffmpeg -hide_banner -loglevel error -f lavfi -i testsrc2=size=320x240:rate=10:duration=1 -c:v libx264 "$proof_dir/in/input.mp4"
+          export HOME="$proof_dir/home"
+          export XDG_CONFIG_HOME="$HOME/.config"
+          export XDG_DATA_HOME="$HOME/.local/share"
+          export XDG_STATE_HOME="$HOME/.local/state"
+          dbus-run-session -- target/release/media-studio install
+          test "$(find "$XDG_DATA_HOME/kio/servicemenus" -name 'media-studio-*.desktop' | wc -l)" -eq 3
+          dbus-run-session -- target/release/media-studio run --job-id ci-kde-proof --profile video_mp4 -- "$proof_dir/in/input.mp4"
+          test -s "$proof_dir/in/input.converted-1.mp4"
+          ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1 "$proof_dir/in/input.converted-1.mp4"
+          cache_builder="$(command -v kbuildsycoca6 || command -v kbuildsycoca5)"
+          "$cache_builder" --noincremental
+          set +e
+          timeout 12s xvfb-run -a dbus-run-session -- dolphin --new-window "$proof_dir/in"
+          dolphin_exit=$?
+          set -e
+          test "$dolphin_exit" -eq 0 -o "$dolphin_exit" -eq 124
+
+  packaging:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Validate packaging manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n packaging/arch/PKGBUILD
+          ruby -e 'require "yaml"; manifest = YAML.load_file("packaging/flatpak/io.github.stranmor.MediaStudio.yml"); abort "bad app id" unless manifest["app-id"] == "io.github.stranmor.MediaStudio"; abort "missing candidate commit" unless manifest.dig("modules", 0, "sources", 0, "commit") == "63dc708153b76ab7f7527579f103ce24ac106872"'
+          cargo metadata --no-deps --format-version 1 >/dev/null
+          test -s packaging/flatpak/io.github.stranmor.MediaStudio.desktop
+          test -x packaging/flatpak/host-tool-wrapper
+          for tool in ffmpeg ffprobe magick systemd-run systemctl kbuildsycoca6 kbuildsycoca5 zenity kdialog; do
+            grep -F "ln -s media-studio-host-tool /app/bin/$tool" packaging/flatpak/io.github.stranmor.MediaStudio.yml
+          done
+
+--- END .github/workflows/ci.yml ---
+[bound full-file sha256: cf60a2a85a2f121bfa88348221d8ffadf659aba22a72dd7f5cecf4127534dedd]
+
+--- BEGIN .github/workflows/release.yml (full file) ---
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@main
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release
+      - name: Build binary and distro packages
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo install cargo-deb cargo-generate-rpm
+          cargo deb --no-build
+          cargo generate-rpm
+          mkdir -p release-assets/stage
+          binary="media-studio-linux-${{ matrix.arch }}"
+          install -Dm755 target/release/media-studio "release-assets/stage/${binary}"
+          deb="$(find target/debian -type f -name '*.deb' -print -quit)"
+          rpm="$(find target/generate-rpm -type f -name '*.rpm' -print -quit)"
+          test -n "$deb" -a -n "$rpm"
+          cp "$deb" release-assets/
+          cp "$rpm" release-assets/
+          tar -czf "release-assets/${binary}.tar.gz" -C release-assets/stage "$binary"
+          (cd release-assets/stage && sha256sum "${binary}") > "release-assets/${binary}.sha256"
+          cp "release-assets/stage/${binary}" release-assets/
+      - uses: actions/upload-artifact@main
+        with:
+          name: media-studio-${{ matrix.arch }}
+          path: release-assets/*
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@main
+        with:
+          path: release-assets
+          merge-multiple: true
+      - uses: softprops/action-gh-release@master
+        with:
+          files: release-assets/*
+
+--- END .github/workflows/release.yml ---
+[bound full-file sha256: c361abd3e597202ba4f27af0c464f4406f1b833e179123a1c18b6c90ef96c472]
+
+--- BEGIN packaging/README.md (full file) ---
+# Packaging
+
+## Arch Linux
+
+`packaging/arch/PKGBUILD` is pinned to the reviewed `v0.2.1` candidate commit and builds `media-studio-git` with Arch's Rust toolchain. The package installs only the binary and documentation; run `media-studio install` as the user who owns the Dolphin session.
+
+## Flatpak
+
+`packaging/flatpak/io.github.stranmor.MediaStudio.yml` is an experimental host-integration manifest. It installs explicit wrappers for `ffmpeg`, `ffprobe`, ImageMagick, user-systemd, KDE cache and dialog commands; wrappers call the same host tools through `flatpak-spawn --host`. It intentionally keeps access to host media tools, `/dev/dri`, user-systemd and Dolphin data, so it is not a strict sandboxed replacement for the native package.
+
+Build with:
+
+```bash
+flatpak-builder --force-clean build-dir packaging/flatpak/io.github.stranmor.MediaStudio.yml
+```
+
+--- END packaging/README.md ---
+[bound full-file sha256: 57e8adcc308c0840d755cccd1cb0c3bb351f1051d88f6720fa7c3e4b7602394b]
+
+--- BEGIN packaging/arch/PKGBUILD (full file) ---
+pkgname=media-studio-git
+pkgver=0.2.1
+pkgrel=1
+pkgdesc='Dolphin-integrated local media conversion studio'
+arch=('x86_64' 'aarch64')
+url='https://github.com/Stranmor/media-studio'
+license=('MIT')
+depends=('ffmpeg' 'kio' 'systemd')
+makedepends=('git' 'rust')
+optdepends=(
+  'imagemagick: image conversion profiles'
+  'zenity: single-window advanced settings'
+  'kdialog: KDE fallback advanced settings'
+)
+source=('git+https://github.com/Stranmor/media-studio.git#commit=63dc708153b76ab7f7527579f103ce24ac106872')
+sha256sums=('SKIP')
+
+pkgver() {
+  cd "$srcdir/media-studio"
+  printf '0.2.1.r%s.g%s\n' "$(git rev-list --count HEAD)" "$(git rev-parse --short HEAD)"
+}
+
+build() {
+  cd "$srcdir/media-studio"
+  cargo build --release
+}
+
+package() {
+  cd "$srcdir/media-studio"
+  install -Dm755 target/release/media-studio "$pkgdir/usr/bin/media-studio"
+  install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+  install -Dm644 README.md "$pkgdir/usr/share/doc/$pkgname/README.md"
+}
+
+--- END packaging/arch/PKGBUILD ---
+[bound full-file sha256: dced0ef189467e5ed0fa767346403744d4da3c23133c979e387dd356c1aa32e3]
+
+--- BEGIN packaging/flatpak/io.github.stranmor.MediaStudio.yml (full file) ---
+app-id: io.github.stranmor.MediaStudio
+runtime: org.freedesktop.Platform
+runtime-version: master
+sdk: org.freedesktop.Sdk
+command: media-studio
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+finish-args:
+  - --share=ipc
+  - --socket=session-bus
+  - --device=dri
+  - --filesystem=home
+  - --filesystem=host
+  - --filesystem=xdg-config/media-studio:create
+  - --filesystem=xdg-config/systemd/user
+  - --filesystem=xdg-data/kio
+  - --filesystem=xdg-state/media-studio:create
+  - --talk-name=org.freedesktop.systemd1
+  - --talk-name=org.freedesktop.Flatpak
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+modules:
+  - name: media-studio
+    buildsystem: simple
+    build-options:
+      build-args:
+        - --share=network
+    sources:
+      - type: git
+        url: https://github.com/Stranmor/media-studio.git
+        commit: 63dc708153b76ab7f7527579f103ce24ac106872
+    build-commands:
+      - cargo build --release
+      - install -Dm755 target/release/media-studio /app/bin/media-studio
+      - install -Dm755 packaging/flatpak/host-tool-wrapper /app/bin/media-studio-host-tool
+      - for tool in ffmpeg ffprobe magick systemd-run systemctl kbuildsycoca6 kbuildsycoca5 zenity kdialog; do ln -s media-studio-host-tool /app/bin/$tool; done
+      - install -Dm644 packaging/flatpak/io.github.stranmor.MediaStudio.desktop /app/share/applications/io.github.stranmor.MediaStudio.desktop
+
+--- END packaging/flatpak/io.github.stranmor.MediaStudio.yml ---
+[bound full-file sha256: 9081222011abe6ef4d75aade30fe5ab08ad158850fb7a76f4d57c3313209b450]
+
+--- BEGIN packaging/flatpak/io.github.stranmor.MediaStudio.desktop (full file) ---
+[Desktop Entry]
+Type=Application
+Name=Media Studio Doctor
+Comment=Проверка локальной интеграции Media Studio
+Exec=media-studio doctor
+Terminal=true
+NoDisplay=true
+Categories=AudioVideo;Utility;
+
+--- END packaging/flatpak/io.github.stranmor.MediaStudio.desktop ---
+[bound full-file sha256: 27a11cabc179a2379056721a82b4e4740f3e807edf0a2ffbfe9420a3b1f4fb45]
+
+--- BEGIN packaging/flatpak/host-tool-wrapper (full file) ---
+#!/bin/sh
+set -eu
+
+tool=${0##*/}
+flatpak_spawn=$(command -v flatpak-spawn || true)
+if [ -z "$flatpak_spawn" ]; then
+    printf '%s\n' "Media Studio Flatpak requires flatpak-spawn for host tool integration" >&2
+    exit 127
+fi
+exec "$flatpak_spawn" --host "$tool" "$@"
+
+--- END packaging/flatpak/host-tool-wrapper ---
+[bound full-file sha256: f0a922f4d99760de7ea5747c96359ae40dac2ccff682d4cbd5a8577ea6c17ab6]
+
+--- BEGIN install.sh (full file) ---
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo="${MEDIA_STUDIO_REPO:-Stranmor/media-studio}"
+case "$(uname -m)" in
+  x86_64) asset="media-studio-linux-x86_64" ;;
+  aarch64|arm64) asset="media-studio-linux-aarch64" ;;
+  *) echo "Unsupported architecture: $(uname -m)" >&2; exit 2 ;;
+esac
+base_url="https://github.com/${repo}/releases/latest/download"
+tmp_dir="$(mktemp -d)"
+trap 'rm -rf "$tmp_dir"' EXIT
+
+echo "Downloading ${repo}/${asset}"
+curl --fail --location --silent --show-error "${base_url}/${asset}" --output "${tmp_dir}/${asset}"
+curl --fail --location --silent --show-error "${base_url}/${asset}.sha256" --output "${tmp_dir}/${asset}.sha256"
+(cd "$tmp_dir" && sha256sum --check "${asset}.sha256")
+
+install -Dm755 "${tmp_dir}/${asset}" "${HOME}/.local/bin/media-studio"
+"${HOME}/.local/bin/media-studio" install
+echo "Media Studio installed at ${HOME}/.local/bin/media-studio"
+
+--- END install.sh ---
+[bound full-file sha256: d985d83120da56a1d4bb7aa82c1400ef22024684065ff223bb1b8d00ec539dc8]

@@ -1,0 +1,168 @@
+{
+  "claim": "Media Studio v0.2.1 candidate commit 7e9f5b0df63385474a25b330bdc50bf5c8d5cace is ready for native Arch/Dolphin/user-systemd release: VAAPI/NVENC capability checks are fail-closed and observable, config and environment fallback policy is honored through queue and watch units, target-size fallback preserves rate controls, atomic output and existing menus are retained, and packaging is bounded to a buildable Arch package plus an explicitly experimental wrapper-backed Flatpak manifest. This is a pre-publicization review; the v0.2.1 tag is intentionally not pushed yet.",
+  "effect_state": "request_ready",
+  "endpoint": "https://antigravity.quantumind.ru/v1/responses",
+  "images": [],
+  "model_preference": [
+    "gpt-5.6-luna"
+  ],
+  "model_requested": "gpt-5.6-luna",
+  "prompt_path": "docs/review/release-v0.2.1/prompt.md",
+  "prompt_sha256": "a00ad1f25aa4a1c2f29af1a233b4dd50ee0a65776dcbeb92d39d29c52cf79e4e",
+  "reasoning_effort_requested": "max",
+  "request_sha256": "4961a3740a49ca3bed7ce85a81b774920f22e0b71309d3e070c4d03a0265fcb6",
+  "review_input_sha256": "1adfbd34f1e92cd750253e67fb355c3adce6779229e2b41f54d8ff54c4d59d89",
+  "schema_version": 1,
+  "sources": [
+    {
+      "bytes": 2045,
+      "line_count": 37,
+      "path": "docs/review/release-v0.2.1/manifest.json",
+      "selection": null,
+      "sha256": "bc277a4a43d804c21951babe3a2343d6f904b9723e5979ee605e2a4aecb52f03"
+    },
+    {
+      "bytes": 1973,
+      "line_count": 18,
+      "path": "docs/review/release-v0.2.1/evidence.md",
+      "selection": null,
+      "sha256": "3a5ff901a0efe7a41eddd709e90b429d345bc1e91ae9b7d5e648168275af6500"
+    },
+    {
+      "bytes": 938,
+      "line_count": 35,
+      "path": "Cargo.toml",
+      "selection": null,
+      "sha256": "dcccaf881dc1d5ba74634dd9270bf065f700cc584b00c0a56da9b81685260fd0"
+    },
+    {
+      "bytes": 7072,
+      "line_count": 134,
+      "path": "README.md",
+      "selection": null,
+      "sha256": "d6732b7958a3bc67b2ec641e5dbc8f46feb204ada9ca521706513e006de515d1"
+    },
+    {
+      "bytes": 1371,
+      "line_count": 38,
+      "path": "CHANGELOG.md",
+      "selection": null,
+      "sha256": "8e0c1de8fdbad78055b597cb9bb1f0213a19f35584172ee40d565c172d3703db"
+    },
+    {
+      "bytes": 1065,
+      "line_count": 21,
+      "path": "LICENSE",
+      "selection": null,
+      "sha256": "814ba8cdecad8297f13e906bfe2e4279d5531c29e6aca469acf02a6a54c4198b"
+    },
+    {
+      "bytes": 44633,
+      "line_count": 1371,
+      "path": "src/main.rs",
+      "selection": null,
+      "sha256": "053381b57aceaf93b7996f5bba23febccad7eb0d0b126c2bfd8f01f512e4a288"
+    },
+    {
+      "bytes": 22738,
+      "line_count": 654,
+      "path": "src/engine.rs",
+      "selection": null,
+      "sha256": "1c032309f316b41f199593d5a90584f83e7f7f1b83f4ac506b7026f2459d832a"
+    },
+    {
+      "bytes": 18765,
+      "line_count": 689,
+      "path": "src/model.rs",
+      "selection": null,
+      "sha256": "f22d26697668902690aaaac82540cbd5747bd7a82bb0d2f1d0cfb0ed26a50a17"
+    },
+    {
+      "bytes": 6108,
+      "line_count": 212,
+      "path": "src/paths.rs",
+      "selection": null,
+      "sha256": "228be0d72373fe9ceccaeea10e38a1bd9d352735df5b75dd2f78c5b5d778d22c"
+    },
+    {
+      "bytes": 5783,
+      "line_count": 180,
+      "path": "src/queue.rs",
+      "selection": null,
+      "sha256": "1cff92aed8581b1ad3e989b7f4dff4224b72b968a43a771c24310012da074170"
+    },
+    {
+      "bytes": 7194,
+      "line_count": 213,
+      "path": "src/ui.rs",
+      "selection": null,
+      "sha256": "28e414f7b3b0f8c56353ab61c99fc0c1e114a7f398901b1b65ffe97547730c45"
+    },
+    {
+      "bytes": 425,
+      "line_count": 14,
+      "path": "src/runtime.rs",
+      "selection": null,
+      "sha256": "10536beb3e1291ab05f21958c1b57c2faeab07ec8bdf3ca6261ce9910f3bdfb4"
+    },
+    {
+      "bytes": 3172,
+      "line_count": 70,
+      "path": ".github/workflows/ci.yml",
+      "selection": null,
+      "sha256": "cf60a2a85a2f121bfa88348221d8ffadf659aba22a72dd7f5cecf4127534dedd"
+    },
+    {
+      "bytes": 1756,
+      "line_count": 57,
+      "path": ".github/workflows/release.yml",
+      "selection": null,
+      "sha256": "c361abd3e597202ba4f27af0c464f4406f1b833e179123a1c18b6c90ef96c472"
+    },
+    {
+      "bytes": 863,
+      "line_count": 15,
+      "path": "packaging/README.md",
+      "selection": null,
+      "sha256": "57e8adcc308c0840d755cccd1cb0c3bb351f1051d88f6720fa7c3e4b7602394b"
+    },
+    {
+      "bytes": 988,
+      "line_count": 33,
+      "path": "packaging/arch/PKGBUILD",
+      "selection": null,
+      "sha256": "dced0ef189467e5ed0fa767346403744d4da3c23133c979e387dd356c1aa32e3"
+    },
+    {
+      "bytes": 1410,
+      "line_count": 37,
+      "path": "packaging/flatpak/io.github.stranmor.MediaStudio.yml",
+      "selection": null,
+      "sha256": "9081222011abe6ef4d75aade30fe5ab08ad158850fb7a76f4d57c3313209b450"
+    },
+    {
+      "bytes": 221,
+      "line_count": 8,
+      "path": "packaging/flatpak/io.github.stranmor.MediaStudio.desktop",
+      "selection": null,
+      "sha256": "27a11cabc179a2379056721a82b4e4740f3e807edf0a2ffbfe9420a3b1f4fb45"
+    },
+    {
+      "bytes": 268,
+      "line_count": 10,
+      "path": "packaging/flatpak/host-tool-wrapper",
+      "selection": null,
+      "sha256": "f0a922f4d99760de7ea5747c96359ae40dac2ccff682d4cbd5a8577ea6c17ab6"
+    },
+    {
+      "bytes": 883,
+      "line_count": 21,
+      "path": "install.sh",
+      "selection": null,
+      "sha256": "d985d83120da56a1d4bb7aa82c1400ef22024684065ff223bb1b8d00ec539dc8"
+    }
+  ],
+  "stream": false,
+  "submitted_at_unix_ms": 1787635481535,
+  "timeout_seconds": 900
+}

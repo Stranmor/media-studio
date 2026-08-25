@@ -1,0 +1,208 @@
+{
+  "schema_version": 1,
+  "claim": "Media Studio v0.2.1 candidate commit 7e9f5b0df63385474a25b330bdc50bf5c8d5cace is ready for native Arch/Dolphin/user-systemd release: VAAPI/NVENC capability checks are fail-closed and observable, config and environment fallback policy is honored through queue and watch units, target-size fallback preserves rate controls, atomic output and existing menus are retained, and packaging is bounded to a buildable Arch package plus an explicitly experimental wrapper-backed Flatpak manifest. This is a pre-publicization review; the v0.2.1 tag is intentionally not pushed yet.",
+  "submitted_at_unix_ms": 1787635552203,
+  "reviewed_at_unix_ms": 1787636382322,
+  "endpoint": "https://antigravity.quantumind.ru/v1/responses",
+  "http_status": 200,
+  "request_sha256": "caaa12e438a629e1e36d21602034719a533787e4f6d96726de2078816f77a9fe",
+  "initial_request_sha256": "caaa12e438a629e1e36d21602034719a533787e4f6d96726de2078816f77a9fe",
+  "transport": "json",
+  "prompt_sha256": "6abc1e7bb222004c6e964e41d83e2013b1f07c17ed4db8038a5ae4415d59ceaf",
+  "review_input_sha256": "8c638d8e0bf325958a5cf282631a975532d0de277c8a0c8fd16355ee3c3a0363",
+  "response_sha256": "0eef772910dcf6dd4872f2b59e36a8c4a77691fd095081e450b36e796235e689",
+  "response_stream_sha256": "a36ad5b2b13b0a8cb16f1e4e7b9f0a473ad3fad844d40d83d098dffe1d326d64",
+  "model_preference": [
+    "gpt-5.6-luna"
+  ],
+  "model_requested": "gpt-5.6-luna",
+  "model_returned": "gpt-5.6-luna",
+  "reasoning_effort_requested": "max",
+  "response_id": "resp_01a929a59b9d1e30016a8d27619a8c87d18bbd53ea663e7800",
+  "response_status": "completed",
+  "sources": [
+    {
+      "path": "docs/review/release-v0.2.1/manifest.json",
+      "sha256": "bc277a4a43d804c21951babe3a2343d6f904b9723e5979ee605e2a4aecb52f03",
+      "bytes": 2045,
+      "line_count": 37,
+      "selection": null
+    },
+    {
+      "path": "docs/review/release-v0.2.1/evidence.md",
+      "sha256": "3a5ff901a0efe7a41eddd709e90b429d345bc1e91ae9b7d5e648168275af6500",
+      "bytes": 1973,
+      "line_count": 18,
+      "selection": null
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "dcccaf881dc1d5ba74634dd9270bf065f700cc584b00c0a56da9b81685260fd0",
+      "bytes": 938,
+      "line_count": 35,
+      "selection": null
+    },
+    {
+      "path": "README.md",
+      "sha256": "d6732b7958a3bc67b2ec641e5dbc8f46feb204ada9ca521706513e006de515d1",
+      "bytes": 7072,
+      "line_count": 134,
+      "selection": null
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "8e0c1de8fdbad78055b597cb9bb1f0213a19f35584172ee40d565c172d3703db",
+      "bytes": 1371,
+      "line_count": 38,
+      "selection": null
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "814ba8cdecad8297f13e906bfe2e4279d5531c29e6aca469acf02a6a54c4198b",
+      "bytes": 1065,
+      "line_count": 21,
+      "selection": null
+    },
+    {
+      "path": "src/main.rs",
+      "sha256": "053381b57aceaf93b7996f5bba23febccad7eb0d0b126c2bfd8f01f512e4a288",
+      "bytes": 44633,
+      "line_count": 1371,
+      "selection": null
+    },
+    {
+      "path": "src/engine.rs",
+      "sha256": "1c032309f316b41f199593d5a90584f83e7f7f1b83f4ac506b7026f2459d832a",
+      "bytes": 22738,
+      "line_count": 654,
+      "selection": null
+    },
+    {
+      "path": "src/model.rs",
+      "sha256": "f22d26697668902690aaaac82540cbd5747bd7a82bb0d2f1d0cfb0ed26a50a17",
+      "bytes": 18765,
+      "line_count": 689,
+      "selection": null
+    },
+    {
+      "path": "src/paths.rs",
+      "sha256": "228be0d72373fe9ceccaeea10e38a1bd9d352735df5b75dd2f78c5b5d778d22c",
+      "bytes": 6108,
+      "line_count": 212,
+      "selection": null
+    },
+    {
+      "path": "src/queue.rs",
+      "sha256": "1cff92aed8581b1ad3e989b7f4dff4224b72b968a43a771c24310012da074170",
+      "bytes": 5783,
+      "line_count": 180,
+      "selection": null
+    },
+    {
+      "path": "src/ui.rs",
+      "sha256": "28e414f7b3b0f8c56353ab61c99fc0c1e114a7f398901b1b65ffe97547730c45",
+      "bytes": 7194,
+      "line_count": 213,
+      "selection": null
+    },
+    {
+      "path": "src/runtime.rs",
+      "sha256": "10536beb3e1291ab05f21958c1b57c2faeab07ec8bdf3ca6261ce9910f3bdfb4",
+      "bytes": 425,
+      "line_count": 14,
+      "selection": null
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "cf60a2a85a2f121bfa88348221d8ffadf659aba22a72dd7f5cecf4127534dedd",
+      "bytes": 3172,
+      "line_count": 70,
+      "selection": null
+    },
+    {
+      "path": ".github/workflows/release.yml",
+      "sha256": "c361abd3e597202ba4f27af0c464f4406f1b833e179123a1c18b6c90ef96c472",
+      "bytes": 1756,
+      "line_count": 57,
+      "selection": null
+    },
+    {
+      "path": "packaging/README.md",
+      "sha256": "57e8adcc308c0840d755cccd1cb0c3bb351f1051d88f6720fa7c3e4b7602394b",
+      "bytes": 863,
+      "line_count": 15,
+      "selection": null
+    },
+    {
+      "path": "packaging/arch/PKGBUILD",
+      "sha256": "dced0ef189467e5ed0fa767346403744d4da3c23133c979e387dd356c1aa32e3",
+      "bytes": 988,
+      "line_count": 33,
+      "selection": null
+    },
+    {
+      "path": "packaging/flatpak/io.github.stranmor.MediaStudio.yml",
+      "sha256": "9081222011abe6ef4d75aade30fe5ab08ad158850fb7a76f4d57c3313209b450",
+      "bytes": 1410,
+      "line_count": 37,
+      "selection": null
+    },
+    {
+      "path": "packaging/flatpak/io.github.stranmor.MediaStudio.desktop",
+      "sha256": "27a11cabc179a2379056721a82b4e4740f3e807edf0a2ffbfe9420a3b1f4fb45",
+      "bytes": 221,
+      "line_count": 8,
+      "selection": null
+    },
+    {
+      "path": "packaging/flatpak/host-tool-wrapper",
+      "sha256": "f0a922f4d99760de7ea5747c96359ae40dac2ccff682d4cbd5a8577ea6c17ab6",
+      "bytes": 268,
+      "line_count": 10,
+      "selection": null
+    },
+    {
+      "path": "install.sh",
+      "sha256": "d985d83120da56a1d4bb7aa82c1400ef22024684065ff223bb1b8d00ec539dc8",
+      "bytes": 883,
+      "line_count": 21,
+      "selection": null
+    }
+  ],
+  "images": [],
+  "ready": false,
+  "output": {
+    "verdict": "REVISE",
+    "claim_status": "pending",
+    "summary": "Hardware checks, fallback behavior, atomic output, queue/watch propagation, Rust checks, and representative native runs are supported, but the packaging gate and existing-menu retention require revision.",
+    "material_defects": [
+      "The packaging CI check expands $tool in grep, while the manifest contains literal /app/bin/$tool; the bound packaging job therefore cannot pass as written.",
+      "install() deletes an existing media-studio.desktop and uninstall() does not restore it, creating a Dolphin menu loss path contrary to the no-regression claim."
+    ],
+    "evidence_gaps": [
+      "The reported Arch artifact is media-studio-proof-0.2.1-1, not the supplied media-studio-git PKGBUILD; its pkgver() would produce a revisioned Git version, so the exact package build is unverified.",
+      "Flatpak validation checks YAML and a literal commit string, but not that the pinned tree is v0.2.1 and contains the referenced wrapper and desktop files."
+    ],
+    "supported_claims": [
+      "VAAPI/NVENC encoder checks, VAAPI render-node validation, overrides, fail-closed behavior, and observable fallback are supported by source and runs.",
+      "Target-size rate flags and atomic output commits are supported by source and evidence.",
+      "Rust formatting, tests, clippy, release build, and native consumer checks are evidenced.",
+      "Queue and watch propagation of the VAAPI device is evidenced.",
+      "Flatpak syntax, wrapper contract, and experimental limitation are statically supported only."
+    ],
+    "prohibited_claims": [
+      "Exact Arch release-package readiness or version validation.",
+      "Flatpak build/runtime readiness.",
+      "Public v0.2.1 tag, release assets, or installer verification."
+    ],
+    "required_changes": [
+      "Fix the packaging CI wrapper check and rerun it.",
+      "Preserve or explicitly migrate media-studio.desktop, with an install/uninstall regression test.",
+      "Build the exact supplied PKGBUILD from the pinned candidate source and reconcile its reported package version."
+    ],
+    "residual_risks": [
+      "Flatpak host integration remains experimental and runtime-unverified.",
+      "Post-push publication and asset readback remain intentionally pending."
+    ]
+  }
+}

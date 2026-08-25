@@ -1,0 +1,206 @@
+{
+  "schema_version": 1,
+  "claim": "Media Studio v0.2.1 candidate is ready for release: VAAPI/NVENC profiles perform real capability checks, honor configuration fallback policy, discover or accept a valid VAAPI render node, provide observable fallback, and Arch plus experimental Flatpak packaging are bound to v0.2.1 without regressing Dolphin, atomic output, queue, watch, or public install behavior.",
+  "submitted_at_unix_ms": 1787631555132,
+  "reviewed_at_unix_ms": 1787632045221,
+  "endpoint": "https://antigravity.quantumind.ru/v1/responses",
+  "http_status": 200,
+  "request_sha256": "ff5b56e3646526e344af2992ae7543f3adf7f4f5bdc0712f60a030331d4325e9",
+  "initial_request_sha256": "ff5b56e3646526e344af2992ae7543f3adf7f4f5bdc0712f60a030331d4325e9",
+  "transport": "json",
+  "prompt_sha256": "8db2363ff1a49ac484b1b2146316e1310a95583fcc737c0e025ca31fb359cafe",
+  "review_input_sha256": "b26e2957a5bda9b25567e027d20d40611090a93926658628bbd7554d0eb52189",
+  "response_sha256": "74fc61f8de6b3d7426766b1be994169070a53140204a0290311a5b6db3a1e395",
+  "response_stream_sha256": "e3ba99f8096ab89734b1d460eab1480fd66ee8e7136986b2718054b5b9d6cc3f",
+  "model_preference": [
+    "gpt-5.6-luna"
+  ],
+  "model_requested": "gpt-5.6-luna",
+  "model_returned": "gpt-5.6-luna",
+  "reasoning_effort_requested": "max",
+  "response_id": "resp_023f51998be01b87016a8d17c4dbac87d191da1234d0c8a45a",
+  "response_status": "completed",
+  "sources": [
+    {
+      "path": "docs/review/release-v0.2.1/manifest.json",
+      "sha256": "58297ae5966e1ea34426785f5fd44aa9662fb39736381f6fba108178e1d9cfff",
+      "bytes": 1601,
+      "line_count": 33,
+      "selection": null
+    },
+    {
+      "path": "docs/review/release-v0.2.1/evidence.md",
+      "sha256": "cc9842fd9943b60de899639ac2ba0b83858b418194a8cb3de6b2a349c0971850",
+      "bytes": 1063,
+      "line_count": 14,
+      "selection": null
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "dcccaf881dc1d5ba74634dd9270bf065f700cc584b00c0a56da9b81685260fd0",
+      "bytes": 938,
+      "line_count": 35,
+      "selection": null
+    },
+    {
+      "path": "README.md",
+      "sha256": "d6732b7958a3bc67b2ec641e5dbc8f46feb204ada9ca521706513e006de515d1",
+      "bytes": 7072,
+      "line_count": 134,
+      "selection": null
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "8e0c1de8fdbad78055b597cb9bb1f0213a19f35584172ee40d565c172d3703db",
+      "bytes": 1371,
+      "line_count": 38,
+      "selection": null
+    },
+    {
+      "path": "LICENSE",
+      "sha256": "814ba8cdecad8297f13e906bfe2e4279d5531c29e6aca469acf02a6a54c4198b",
+      "bytes": 1065,
+      "line_count": 21,
+      "selection": null
+    },
+    {
+      "path": "src/main.rs",
+      "sha256": "c5a603673d5e9b37143eb97ff0a18587d8115911d5eaa88da3e95149900234e7",
+      "bytes": 43986,
+      "line_count": 1356,
+      "selection": null
+    },
+    {
+      "path": "src/engine.rs",
+      "sha256": "27aa51874a642fc964563079556df155d6df7bbfbd24bd9343cc94d7f398fedd",
+      "bytes": 21690,
+      "line_count": 627,
+      "selection": null
+    },
+    {
+      "path": "src/model.rs",
+      "sha256": "f22d26697668902690aaaac82540cbd5747bd7a82bb0d2f1d0cfb0ed26a50a17",
+      "bytes": 18765,
+      "line_count": 689,
+      "selection": null
+    },
+    {
+      "path": "src/paths.rs",
+      "sha256": "228be0d72373fe9ceccaeea10e38a1bd9d352735df5b75dd2f78c5b5d778d22c",
+      "bytes": 6108,
+      "line_count": 212,
+      "selection": null
+    },
+    {
+      "path": "src/queue.rs",
+      "sha256": "88920205feceb7e6eb63598878e403856374a692ef9903ee4c2631ac81d04d18",
+      "bytes": 5008,
+      "line_count": 161,
+      "selection": null
+    },
+    {
+      "path": "src/ui.rs",
+      "sha256": "28e414f7b3b0f8c56353ab61c99fc0c1e114a7f398901b1b65ffe97547730c45",
+      "bytes": 7194,
+      "line_count": 213,
+      "selection": null
+    },
+    {
+      "path": "src/runtime.rs",
+      "sha256": "10536beb3e1291ab05f21958c1b57c2faeab07ec8bdf3ca6261ce9910f3bdfb4",
+      "bytes": 425,
+      "line_count": 14,
+      "selection": null
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "8c9e36248067472112dfc5f5ccd4e80ac60940618c78026b6efdf38ccb6c7a2e",
+      "bytes": 2831,
+      "line_count": 66,
+      "selection": null
+    },
+    {
+      "path": ".github/workflows/release.yml",
+      "sha256": "c361abd3e597202ba4f27af0c464f4406f1b833e179123a1c18b6c90ef96c472",
+      "bytes": 1756,
+      "line_count": 57,
+      "selection": null
+    },
+    {
+      "path": "packaging/README.md",
+      "sha256": "36c835effab03e9c7245d7449d03b9079be9ac614e42e5301f44ce84586d30eb",
+      "bytes": 665,
+      "line_count": 15,
+      "selection": null
+    },
+    {
+      "path": "packaging/arch/PKGBUILD",
+      "sha256": "a756348af042b04f10707cc105cf64ee44b7d1a566bc78b28e2b86cf977209f9",
+      "bytes": 951,
+      "line_count": 33,
+      "selection": null
+    },
+    {
+      "path": "packaging/flatpak/io.github.stranmor.MediaStudio.yml",
+      "sha256": "d0206905518a3524b8f235c53e756ba3603404a90ac492342760c3abc3c3cf49",
+      "bytes": 1081,
+      "line_count": 34,
+      "selection": null
+    },
+    {
+      "path": "packaging/flatpak/io.github.stranmor.MediaStudio.desktop",
+      "sha256": "27a11cabc179a2379056721a82b4e4740f3e807edf0a2ffbfe9420a3b1f4fb45",
+      "bytes": 221,
+      "line_count": 8,
+      "selection": null
+    },
+    {
+      "path": "install.sh",
+      "sha256": "d985d83120da56a1d4bb7aa82c1400ef22024684065ff223bb1b8d00ec539dc8",
+      "bytes": 883,
+      "line_count": 21,
+      "selection": null
+    }
+  ],
+  "images": [],
+  "ready": false,
+  "output": {
+    "verdict": "REVISE",
+    "claim_status": "negative",
+    "summary": "Rust and direct hardware evidence is positive, but known queue/override and Flatpak defects plus missing source, packaging, and consumer proof prevent release readiness.",
+    "material_defects": [
+      "The Flatpak manifest provides permissions but no ffmpeg, ffprobe, ImageMagick, dialog, KDE cache, or systemd command provision/wrappers. The application resolves these tools directly with which and invokes them directly, so filesystem access alone does not provide the advertised host integration.",
+      "Queued and watch executions do not propagate MEDIA_STUDIO_VAAPI_DEVICE. The override is read from the service environment, but queue.rs supplies neither --setenv nor a device argument; direct-run evidence does not prove the Dolphin/user-systemd path honors it.",
+      "When a selected hardware encoder fails at runtime, run_ffmpeg_once invokes fallback_args without the target-size rate flags. Hardware fallback with target_size_mb can therefore miss the requested size or exhaust retries.",
+      "ffmpeg_encoder_available ignores the ffmpeg probe exit status and parses stderr as well as stdout, allowing a failed capability query containing the encoder token to be treated as available."
+    ],
+    "evidence_gaps": [
+      "No flatpak-builder build was run; only YAML parsing and literal tag checks are evidenced.",
+      "The v0.2.1 tag was not pushed, and neither package manifest fetches or pins the candidate digest.",
+      "No queued/watch test proves MEDIA_STUDIO_VAAPI_DEVICE propagation.",
+      "No evidence covers disabled fallback, invalid VAAPI override, target-size hardware fallback, Dolphin menus, queue/watch behavior, collision-safe atomic commits, or install.sh/public assets."
+    ],
+    "supported_claims": [
+      "Formatting, 11 Rust tests, clippy, and release build passed according to the bounded evidence.",
+      "Direct VAAPI and NVENC runs show a selected VAAPI device, observable NVENC runtime fallback, committed output, and verification.",
+      "The source contains exact-token encoder checks, render-node validation, environment/config override precedence, fail-closed branching, and fallback log markers.",
+      "Arch parsing and Flatpak YAML/app-id/tag checks passed; the README explicitly labels Flatpak experimental and non-strict."
+    ],
+    "prohibited_claims": [
+      "Do not claim the Flatpak host-integration package works.",
+      "Do not claim MEDIA_STUDIO_VAAPI_DEVICE works through Dolphin, queue, or watch execution.",
+      "Do not claim the package sources are bound to this candidate digest or that public v0.2.1 installation was verified.",
+      "Do not claim Dolphin, queue/watch, atomic-output, or public-install non-regression from the supplied evidence."
+    ],
+    "required_changes": [
+      "Provide or explicitly wrap the required host tools in Flatpak, then run an actual flatpak-builder and host-integration test.",
+      "Propagate the VAAPI device through queued/watch jobs, preserve target-rate flags on runtime fallback, and make the encoder probe fail closed on nonzero status.",
+      "Fetch or publish v0.2.1 and verify both manifests against the exact candidate source; perform an actual Arch package build.",
+      "Run disabled/invalid hardware tests plus Dolphin, queue/watch, atomic-output, and public installer/release checks."
+    ],
+    "residual_risks": [
+      "Flatpak runtime-version: master is unpinned and unbuilt.",
+      "The release workflow does not itself verify that the release tag, Cargo version, package sources, and candidate digest match."
+    ]
+  }
+}

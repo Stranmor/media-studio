@@ -1,0 +1,179 @@
+{
+  "schema_version": 1,
+  "claim": "Media Studio v0.2.1 candidate is ready for release: VAAPI/NVENC profiles perform real capability checks, discover or accept a VAAPI render node override, fail safely to software when enabled, and Arch plus experimental Flatpak packaging are valid without regressing Dolphin, atomic output, queue, watch, or public install behavior.",
+  "submitted_at_unix_ms": 1787630741640,
+  "reviewed_at_unix_ms": 1787631241661,
+  "endpoint": "https://antigravity.quantumind.ru/v1/responses",
+  "http_status": 200,
+  "request_sha256": "ffc162137ee2039bc47aacd3c7253c82860a8584223c7ab850083a448b6d091b",
+  "initial_request_sha256": "ffc162137ee2039bc47aacd3c7253c82860a8584223c7ab850083a448b6d091b",
+  "transport": "json",
+  "prompt_sha256": "8db2363ff1a49ac484b1b2146316e1310a95583fcc737c0e025ca31fb359cafe",
+  "review_input_sha256": "e199e8abad3d4fac0e3cb5f3a491675f3b691137972bcc3730d654ad288e0493",
+  "response_sha256": "b5190bcacd65dc48ac885bbe8506d69bc3c513b2c36edde14e5c467788958f80",
+  "response_stream_sha256": "eda2b2b16c8fbf87d62bd34f5d7124f250b69397d50d862d94a4b56ee7b0becd",
+  "model_preference": [
+    "gpt-5.6-luna"
+  ],
+  "model_requested": "gpt-5.6-luna",
+  "model_returned": "gpt-5.6-luna",
+  "reasoning_effort_requested": "max",
+  "response_id": "resp_061df5ab78e5a495016a8d1497ce1c87d0bc8468b28bedb8ed",
+  "response_status": "completed",
+  "sources": [
+    {
+      "path": "docs/review/release-v0.2.1/manifest.json",
+      "sha256": "12f94e02172af2230c474a8fbd5a3e6c99ac99803e051af6942546ab15fd635b",
+      "bytes": 1341,
+      "line_count": 29,
+      "selection": null
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "dcccaf881dc1d5ba74634dd9270bf065f700cc584b00c0a56da9b81685260fd0",
+      "bytes": 938,
+      "line_count": 35,
+      "selection": null
+    },
+    {
+      "path": "README.md",
+      "sha256": "d6732b7958a3bc67b2ec641e5dbc8f46feb204ada9ca521706513e006de515d1",
+      "bytes": 7072,
+      "line_count": 134,
+      "selection": null
+    },
+    {
+      "path": "CHANGELOG.md",
+      "sha256": "8e0c1de8fdbad78055b597cb9bb1f0213a19f35584172ee40d565c172d3703db",
+      "bytes": 1371,
+      "line_count": 38,
+      "selection": null
+    },
+    {
+      "path": "src/main.rs",
+      "sha256": "f746c0a9c3f0b2df0dbaa5bad443eef913cca4cd28137e43a52afa0a337b363c",
+      "bytes": 43419,
+      "line_count": 1343,
+      "selection": null
+    },
+    {
+      "path": "src/engine.rs",
+      "sha256": "52482538f5963a653c534c1407d3226f76ec1dd1e44ead5ebd3656fde8543abc",
+      "bytes": 21476,
+      "line_count": 621,
+      "selection": null
+    },
+    {
+      "path": "src/model.rs",
+      "sha256": "f22d26697668902690aaaac82540cbd5747bd7a82bb0d2f1d0cfb0ed26a50a17",
+      "bytes": 18765,
+      "line_count": 689,
+      "selection": null
+    },
+    {
+      "path": "src/paths.rs",
+      "sha256": "228be0d72373fe9ceccaeea10e38a1bd9d352735df5b75dd2f78c5b5d778d22c",
+      "bytes": 6108,
+      "line_count": 212,
+      "selection": null
+    },
+    {
+      "path": "src/queue.rs",
+      "sha256": "1ca53340465757d311ff31fc7e5c7ea089748d14789ec8f06955d428bd8bd51b",
+      "bytes": 4262,
+      "line_count": 138,
+      "selection": null
+    },
+    {
+      "path": "src/ui.rs",
+      "sha256": "28e414f7b3b0f8c56353ab61c99fc0c1e114a7f398901b1b65ffe97547730c45",
+      "bytes": 7194,
+      "line_count": 213,
+      "selection": null
+    },
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "ec07e7c057ab8ac5dddf92b24685f7bc80840d9cf88b2239f80bb470bad057f6",
+      "bytes": 2830,
+      "line_count": 66,
+      "selection": null
+    },
+    {
+      "path": ".github/workflows/release.yml",
+      "sha256": "c361abd3e597202ba4f27af0c464f4406f1b833e179123a1c18b6c90ef96c472",
+      "bytes": 1756,
+      "line_count": 57,
+      "selection": null
+    },
+    {
+      "path": "packaging/README.md",
+      "sha256": "2aa75d1971d8a04884fe478d1646f825492c9e10554e2b9214bed943e3d9b76c",
+      "bytes": 664,
+      "line_count": 15,
+      "selection": null
+    },
+    {
+      "path": "packaging/arch/PKGBUILD",
+      "sha256": "f8707d7ce6f23a27848d278cb6762f4b7d3e261407ab61fa93de493487e8cf5a",
+      "bytes": 952,
+      "line_count": 33,
+      "selection": null
+    },
+    {
+      "path": "packaging/flatpak/io.github.stranmor.MediaStudio.yml",
+      "sha256": "00cc63caa5447a1224914295e3d6e0f75ee0c259e56595a7bcfe0895fb8834ea",
+      "bytes": 1082,
+      "line_count": 34,
+      "selection": null
+    },
+    {
+      "path": "packaging/flatpak/io.github.stranmor.MediaStudio.desktop",
+      "sha256": "27a11cabc179a2379056721a82b4e4740f3e807edf0a2ffbfe9420a3b1f4fb45",
+      "bytes": 221,
+      "line_count": 8,
+      "selection": null
+    }
+  ],
+  "images": [],
+  "ready": false,
+  "output": {
+    "verdict": "REVISE",
+    "claim_status": "negative",
+    "summary": "Not ready for release: static fallback, render-node, and queue/watch defects exist, Flatpak integration is unestablished, and mandatory pass evidence is absent.",
+    "material_defects": [
+      "Dolphin/CLI enqueue defaults hardware_fallback to true and ignores Config.hardware_fallback, so config.toml hardware_fallback=false does not fail closed for ordinary jobs.",
+      "Capability-preflight fallback logs no HARDWARE_FALLBACK marker, while status and notification logic depend on that marker; fallback observability is inconsistent.",
+      "Explicit VAAPI overrides are accepted if they are any character device; they are not verified to be actual DRM render nodes.",
+      "queue list and cancel match media-studio-watch-*.service, allowing watch units to appear as jobs and be canceled as jobs.",
+      "Flatpak builds only the application binary and provides no demonstrated bridge or bundled tools for required ffmpeg, ffprobe, systemd, KDE, and dialog commands.",
+      "Arch and Flatpak sources follow mutable main rather than pinning the reviewed candidate, so artifacts may differ from the bound tree."
+    ],
+    "evidence_gaps": [
+      "No execution results prove fmt, clippy, tests, build, packaging, or consumer checks passed.",
+      "No VAAPI/NVENC hardware or fallback-matrix results are supplied.",
+      "The bound evidence omits runtime.rs, install.sh, LICENSE, and any package-build outputs.",
+      "Neither packaging manifest is checked against the candidate digest."
+    ],
+    "supported_claims": [
+      "The code contains exact h264_vaapi/h264_nvenc listing checks, automatic render-node discovery, environment/config override handling, and software fallback arguments.",
+      "Atomic output persistence uses temporary files with persist/persist_noclobber.",
+      "The documentation explicitly identifies Flatpak as experimental host integration rather than a strict sandbox replacement."
+    ],
+    "prohibited_claims": [
+      "Do not claim the candidate is release-ready.",
+      "Do not claim all required validation and consumer checks passed.",
+      "Do not claim Flatpak host integration is operational or that fallback status reporting is correct."
+    ],
+    "required_changes": [
+      "Honor the configuration fallback default, emit one consistent fallback marker/reason, and add enabled/disabled tests.",
+      "Validate explicit VAAPI paths as real render nodes and test encoder/device behavior.",
+      "Separate conversion-unit names from watch-unit names and filter/reject watch units in queue operations.",
+      "Pin packaging sources to the candidate, run actual makepkg/flatpak-builder and desktop validation, execute the Rust and consumer checks, and supply results."
+    ],
+    "residual_risks": [
+      "ffmpeg -encoders listing presence does not prove driver-level VAAPI/NVENC usability.",
+      "Flatpak runtime-version master and broad host/D GPU/systemd permissions are mutable and high-risk.",
+      "Public install behavior remains unverified because the installer script is not bound."
+    ]
+  }
+}

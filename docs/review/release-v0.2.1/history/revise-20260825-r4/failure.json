@@ -1,0 +1,9 @@
+{
+  "effect_state": "external_review_not_accepted",
+  "error": {
+    "message": "independent verdict is not READY with zero required changes",
+    "type": "ExternalReviewError"
+  },
+  "failed_at_unix_ms": 1787636382359,
+  "schema_version": 1
+}
