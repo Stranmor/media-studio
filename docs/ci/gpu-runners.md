@@ -11,7 +11,7 @@ Each runner must have the following labels:
 - `gpu`
 - exactly one backend label: `vaapi` or `nvenc`
 
-Both runners must provide Rust/Cargo, `ffmpeg`, `ffprobe`, `systemd-run`, and a dialog backend (`zenity` or `kdialog`). The VAAPI runner must expose the character device `/dev/dri/renderD128`, grant the runner user access to it, and provide an FFmpeg build with `h264_vaapi`. The NVENC runner must expose a working NVIDIA driver, `nvidia-smi`, the NVIDIA device nodes (`/dev/nvidia0`, `/dev/nvidiactl`, and `/dev/nvidia-uvm` when present), runner-user access to those nodes, and an FFmpeg build with `h264_nvenc`.
+Both runners must provide Rust/Cargo, `ffmpeg` with the `libx264` encoder, `ffprobe`, `systemd-run`, and a dialog backend (`zenity` or `kdialog`). The smoke preflight rejects a runner missing any required encoder. The VAAPI runner must expose the character device `/dev/dri/renderD128`, grant the runner user access to it, and provide an FFmpeg build with `h264_vaapi`. The NVENC runner must expose a working NVIDIA driver, `nvidia-smi`, the NVIDIA device nodes (`/dev/nvidia0`, `/dev/nvidiactl`, and `/dev/nvidia-uvm` when present), runner-user access to those nodes, and an FFmpeg build with `h264_nvenc`.
 
 ## What the workflow proves
 

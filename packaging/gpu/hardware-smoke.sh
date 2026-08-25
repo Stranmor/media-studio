@@ -23,7 +23,9 @@ case "$backend" in
 esac
 
 encoder_listing="$(ffmpeg -hide_banner -encoders 2>/dev/null)"
-grep -Eq "^[[:space:]]*[A-Z.]{6}[[:space:]]+${encoder}([[:space:]]|$)" <<<"$encoder_listing"
+for required_encoder in libx264 "$encoder"; do
+  grep -Eq "^[[:space:]]*[A-Z.]{6}[[:space:]]+${required_encoder}([[:space:]]|$)" <<<"$encoder_listing"
+done
 command -v systemd-run >/dev/null
 
 cargo build --release

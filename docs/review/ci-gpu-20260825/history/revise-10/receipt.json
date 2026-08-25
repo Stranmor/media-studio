@@ -1,0 +1,107 @@
+{
+  "schema_version": 1,
+  "claim": "Media Studio main has a bounded current-checkout Flatpak-builder/runtime smoke job using the required Flathub-compatible Freedesktop runtime branch and valid Flatpak filesystem permissions, plus a protected manual VAAPI/NVENC self-hosted hardware matrix. This claim excludes production Flatpak sandbox readiness, host integration readiness, reproducible builds, and universal GPU availability.",
+  "submitted_at_unix_ms": 1787697351072,
+  "reviewed_at_unix_ms": 1787698129732,
+  "endpoint": "https://antigravity.quantumind.ru/v1/responses",
+  "http_status": 200,
+  "request_sha256": "5d6e1d07fcb8ca2945f4a486578cb0bbeed40f30ab6eb604774048df84b3e73a",
+  "initial_request_sha256": "5d6e1d07fcb8ca2945f4a486578cb0bbeed40f30ab6eb604774048df84b3e73a",
+  "transport": "json",
+  "prompt_sha256": "b4e06c09f2e467d765ea1d5cbe7c4e6578daac3be47bff2e9826a0e0f21e4690",
+  "review_input_sha256": "b4c592d7b625d81b43f638f76337d2d528f28e379f1c65f02b1d11b2c45cebbc",
+  "response_sha256": "9fb1f81d12fed740655f261ec44e5f98d1b69e83930817d63887b06393b25f14",
+  "response_stream_sha256": "14dff2174f83878cb7ccc575e582acca016228f77adb9f618b1b1fe97d044fbf",
+  "model_preference": [
+    "gpt-5.6-luna"
+  ],
+  "model_requested": "gpt-5.6-luna",
+  "model_returned": "gpt-5.6-luna",
+  "reasoning_effort_requested": "max",
+  "response_id": "resp_0d6263cdc65403b5016a8e18ca088087d0b05c82f0c5a631d2",
+  "response_status": "completed",
+  "sources": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "23d360d8656cbc939e16f436e4b978b3e12c003a694aa2499561a6a7baaa9967",
+      "bytes": 5871,
+      "line_count": 117,
+      "selection": null
+    },
+    {
+      "path": ".github/workflows/gpu.yml",
+      "sha256": "8bcffdce487804467d925a8be54d1a2b6a1203a872b9b43cca75bc36fbcabdd1",
+      "bytes": 978,
+      "line_count": 36,
+      "selection": null
+    },
+    {
+      "path": "packaging/gpu/hardware-smoke.sh",
+      "sha256": "c89e605c0efdbfe2fd080f5386ad4a4cd072c82d3d6ec22c5515bbcab552f74f",
+      "bytes": 2149,
+      "line_count": 68,
+      "selection": null
+    },
+    {
+      "path": "docs/ci/gpu-runners.md",
+      "sha256": "7aa0665668e302b71b187487e872e3b1afb7a850195ff07d48466cff8c2ceeeb",
+      "bytes": 1311,
+      "line_count": 20,
+      "selection": null
+    },
+    {
+      "path": "packaging/flatpak/io.github.stranmor.MediaStudio.yml",
+      "sha256": "742dc73577b20aef861797bd1bb4caf4c9a781a46d48ba9b8f93eae78ac4bb85",
+      "bytes": 1391,
+      "line_count": 37,
+      "selection": null
+    },
+    {
+      "path": "packaging/flatpak/io.github.stranmor.MediaStudio.ci.yml",
+      "sha256": "789a9d5002aa107370b4bdaaac0d9b27f17e766fc2a540a06f4ea1cb0f6e1e6f",
+      "bytes": 1296,
+      "line_count": 36,
+      "selection": null
+    },
+    {
+      "path": "src/engine.rs",
+      "sha256": "2762d240f707ca9284d5337a8666d64067d899a2fc07976782db3a0c8517959c",
+      "bytes": 23518,
+      "line_count": 684,
+      "selection": null
+    }
+  ],
+  "images": [],
+  "ready": false,
+  "output": {
+    "verdict": "REVISE",
+    "claim_status": "Mostly supported structurally, but the GPU runner contract is incomplete and external execution is unverified.",
+    "summary": "The Flatpak workflow has bounded push-only builder, bundle-install, and in-sandbox runtime steps; the GPU workflow has the required main/repository guard, self-hosted matrix, encoder checks, fallback disabling, and verification markers. Revise the incomplete runner contract before accepting the claim.",
+    "material_defects": [
+      "MEDIUM — packaging/gpu/hardware-smoke.sh fixture command versus docs/ci/gpu-runners.md runner contract: the fixture unconditionally requires FFmpeg's libx264 encoder, but the documented runner requirements only require h264_vaapi or h264_nvenc. A runner satisfying the documented requirements can fail before exercising hardware coverage. Add an exact libx264 preflight and document it, or use explicitly guaranteed fixture encoders."
+    ],
+    "evidence_gaps": [
+      "No supplied CI results prove the Flatpak bundle was built, installed, or run, or that either self-hosted matrix entry passed.",
+      "The supplied files omit CLI/config defaults, profile definitions, and log-path wiring; verify_results and --hardware-fallback=false mapping cannot be independently confirmed.",
+      "Actual gpu-hardware environment protection, runner labels, device access, drivers, and script executable mode are external to the bound files."
+    ],
+    "supported_claims": [
+      ".github/workflows/ci.yml: the Flatpak job is push-only, has a 60-minute bound, invokes the Flatpak-builder action, installs the bundle, and runs the packaged command inside Flatpak.",
+      "The supplied manifests use Freedesktop 25.08; the packaging parity and xdg-data/kio checks satisfy the stated contract.",
+      ".github/workflows/gpu.yml and docs/ci/gpu-runners.md specify manual trusted execution, main-repository gating, backend labels, VAAPI/NVENC devices, and a 30-minute bound.",
+      "packaging/gpu/hardware-smoke.sh and src/engine.rs structurally require exact hardware encoder names, disable software fallback, require a nonempty verified output, and reject fallback log markers."
+    ],
+    "prohibited_claims": [
+      "Do not claim production Flatpak sandbox or host-integration readiness.",
+      "Do not claim reproducible builds from the mutable action/dependency references.",
+      "Do not claim universal GPU availability or external CI success."
+    ],
+    "required_changes": [
+      "Add libx264 to the explicit GPU runner contract and verify it before fixture generation, or replace the fixture codec with an explicitly checked alternative."
+    ],
+    "residual_risks": [
+      "The Flatpak artifact retains broad host permissions and a privileged builder by design; the smoke is push-only and remains experimental.",
+      "The GPU proof covers only trusted, manually dispatched VAAPI/NVENC runners."
+    ]
+  }
+}

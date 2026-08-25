@@ -1,0 +1,72 @@
+{
+  "claim": "Media Studio main has a bounded current-checkout Flatpak-builder/runtime smoke job using the required Flathub-compatible Freedesktop runtime branch and valid Flatpak filesystem permissions, plus a protected manual VAAPI/NVENC self-hosted hardware matrix. This claim excludes production Flatpak sandbox readiness, host integration readiness, reproducible builds, and universal GPU availability.",
+  "effect_state": "request_ready",
+  "effective_request_sha256": "3aff2066d6c1de5170ba7a86f2ff9812f06f81ecf1da5ecc0dd3e03ed504d78e",
+  "endpoint": "https://antigravity.quantumind.ru/v1/responses",
+  "images": [],
+  "model_preference": [
+    "gpt-5.6-luna"
+  ],
+  "model_requested": "gpt-5.6-luna",
+  "prompt_path": "docs/review/ci-gpu-20260825/prompt.md",
+  "prompt_sha256": "b4e06c09f2e467d765ea1d5cbe7c4e6578daac3be47bff2e9826a0e0f21e4690",
+  "reasoning_effort_requested": "max",
+  "request_sha256": "3aff2066d6c1de5170ba7a86f2ff9812f06f81ecf1da5ecc0dd3e03ed504d78e",
+  "review_input_sha256": "9bf45711eee3014edfbe08c39ea18678fcf2437c681537e5c4e4baaaa17c0765",
+  "schema_version": 1,
+  "sources": [
+    {
+      "bytes": 5871,
+      "line_count": 117,
+      "path": ".github/workflows/ci.yml",
+      "selection": null,
+      "sha256": "23d360d8656cbc939e16f436e4b978b3e12c003a694aa2499561a6a7baaa9967"
+    },
+    {
+      "bytes": 978,
+      "line_count": 36,
+      "path": ".github/workflows/gpu.yml",
+      "selection": null,
+      "sha256": "8bcffdce487804467d925a8be54d1a2b6a1203a872b9b43cca75bc36fbcabdd1"
+    },
+    {
+      "bytes": 2212,
+      "line_count": 70,
+      "path": "packaging/gpu/hardware-smoke.sh",
+      "selection": null,
+      "sha256": "b6e6470cd69687baaa5fbcb2987c8c9a077807a32548c5eb19fb28b77cefb3e8"
+    },
+    {
+      "bytes": 1405,
+      "line_count": 20,
+      "path": "docs/ci/gpu-runners.md",
+      "selection": null,
+      "sha256": "583e85d4a3ad9fecbb2c338813c8fb70e836a40a50c74f5be16ad8b414657571"
+    },
+    {
+      "bytes": 1391,
+      "line_count": 37,
+      "path": "packaging/flatpak/io.github.stranmor.MediaStudio.yml",
+      "selection": null,
+      "sha256": "742dc73577b20aef861797bd1bb4caf4c9a781a46d48ba9b8f93eae78ac4bb85"
+    },
+    {
+      "bytes": 1296,
+      "line_count": 36,
+      "path": "packaging/flatpak/io.github.stranmor.MediaStudio.ci.yml",
+      "selection": null,
+      "sha256": "789a9d5002aa107370b4bdaaac0d9b27f17e766fc2a540a06f4ea1cb0f6e1e6f"
+    },
+    {
+      "bytes": 23518,
+      "line_count": 684,
+      "path": "src/engine.rs",
+      "selection": null,
+      "sha256": "2762d240f707ca9284d5337a8666d64067d899a2fc07976782db3a0c8517959c"
+    }
+  ],
+  "stream": false,
+  "submitted_at_unix_ms": 1787698323212,
+  "timeout_seconds": 1800,
+  "transport": "json"
+}
