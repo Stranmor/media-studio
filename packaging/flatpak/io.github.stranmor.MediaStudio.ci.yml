@@ -1,6 +1,6 @@
 app-id: io.github.stranmor.MediaStudio
 runtime: org.freedesktop.Platform
-runtime-version: master
+runtime-version: "25.08"
 sdk: org.freedesktop.Sdk
 command: media-studio
 sdk-extensions:

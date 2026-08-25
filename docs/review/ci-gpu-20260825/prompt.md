@@ -10,7 +10,7 @@ Acceptance criteria:
 4. Runner labels and device requirements must be explicit enough for an operator to provision the two matrix entries without guessing.
 5. Shell, YAML, Rust, and repository-consumer behavior must have no material correctness or safety defect introduced by these changes.
 
-Project policy intentionally uses live-at-head dependency and action references, including the Flatpak runtime branch `master` and mutable upstream action branches. Do not require version pinning as a correction; check instead that protected-ref conditions and claim boundaries prevent those choices from being misrepresented as reproducibility guarantees. The privileged Flatpak builder container is an upstream builder requirement and is allowed only on push events, never on pull requests.
+Project policy intentionally uses live-at-head dependency and action references, including mutable upstream action branches. The Flatpak runtime branch is an explicit compatibility requirement of the Flatpak manifest because Flathub does not publish a `master` runtime; do not treat this required platform branch as a reproducible application dependency. Check instead that protected-ref conditions and claim boundaries prevent the mutable action references from being misrepresented as reproducibility guarantees. The privileged Flatpak builder container is an upstream builder requirement and is allowed only on push events, never on pull requests.
 
 The packaging job compares the release manifest with `io.github.stranmor.MediaStudio.ci.yml` after replacing only the git source with the current checkout directory, and explicitly checks `--filesystem=xdg-data/kio`; treat that parity contract as satisfied when the supplied files contain those checks.
 

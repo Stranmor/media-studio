@@ -1,0 +1,9 @@
+{
+  "effect_state": "external_review_not_accepted",
+  "error": {
+    "message": "canonical external review API returned HTTP 502 Bad Gateway: {\"error\":{\"message\":\"Upstream Codex stream interrupted: error decoding response body\",\"type\":\"server_error\",\"code\":\"502\"}}",
+    "type": "ExternalReviewError"
+  },
+  "failed_at_unix_ms": 1787643408308,
+  "schema_version": 1
+}
