@@ -1,36 +1,36 @@
 {
   "schema_version": 1,
-  "claim": "Media Studio v0.2.1 candidate commit 4b44fce7c1001760b2c57b386476f6532981b6df is ready for native Arch/Dolphin/user-systemd release: VAAPI/NVENC capability checks are fail-closed and observable, config and environment fallback policy is honored through queue and watch units, target-size fallback preserves rate controls, atomic output and existing menus are retained with reversible legacy migration, the stable Arch package recipe builds media-studio 0.2.1, and packaging is bounded to an explicitly experimental wrapper-backed Flatpak manifest. This is a pre-publicization review; the v0.2.1 tag is intentionally not pushed yet.",
-  "submitted_at_unix_ms": 1787636735728,
-  "reviewed_at_unix_ms": 1787637097418,
+  "claim": "Media Studio v0.2.1 native release remains ready after the post-push portable CI fix in candidate commit ac414f4b1baf6c86faaa69d01cdb61542d1000c7: release behavior and Arch/Dolphin/user-systemd consumer proof remain unchanged, packaging CI safely handles Ubuntu without makepkg and fetches the pinned source before verification, while Flatpak remains explicitly experimental and runtime-unverified.",
+  "submitted_at_unix_ms": 1787637482847,
+  "reviewed_at_unix_ms": 1787637760412,
   "endpoint": "https://antigravity.quantumind.ru/v1/responses",
   "http_status": 200,
-  "request_sha256": "a952451e6c5497283d7af267025ec2334949eb19f6e476f5910c2d1a3506fe50",
-  "initial_request_sha256": "a952451e6c5497283d7af267025ec2334949eb19f6e476f5910c2d1a3506fe50",
+  "request_sha256": "5f1287ed1f8968c94f5ef6642984dbeca9a3da2b7c4f1cb66bea9feaeb1b6103",
+  "initial_request_sha256": "5f1287ed1f8968c94f5ef6642984dbeca9a3da2b7c4f1cb66bea9feaeb1b6103",
   "transport": "json",
   "prompt_sha256": "6abc1e7bb222004c6e964e41d83e2013b1f07c17ed4db8038a5ae4415d59ceaf",
-  "review_input_sha256": "310c7326df76b135f3d5d401adb5984ff42495c5a8122830515718b0a7bb3cdf",
-  "response_sha256": "2cb45fbc6a7f5e89af2f392186e13393c7a532b3dbf2b30d52ace4fbc2a0bc7e",
-  "response_stream_sha256": "ba57bd8a7168b8034bd05185ea59f06e04f33244dbc1b21c13996eb5a9af77d5",
+  "review_input_sha256": "63a59170c5c80b70cc6c39a60c2b04218a4b7e276115ea58699855c53aa0ddc3",
+  "response_sha256": "713ffa7ce000b20e079298ef7f9f1131b4e9dae332d9e0bfe93848c918225823",
+  "response_stream_sha256": "fad48584eeb10b1d1e0946d110c748fb21caf9202b245df8a4755fd49b0eaba0",
   "model_preference": [
     "gpt-5.6-luna"
   ],
   "model_requested": "gpt-5.6-luna",
   "model_returned": "gpt-5.6-luna",
   "reasoning_effort_requested": "max",
-  "response_id": "resp_0a9753918884a857016a8d2c01b28487d1a724ad7c3e2ded5b",
+  "response_id": "resp_064e198a84e4a83e016a8d2eec3a8c87d29e1c67548b852e88",
   "response_status": "completed",
   "sources": [
     {
       "path": "docs/review/release-v0.2.1/manifest.json",
-      "sha256": "054b0855b4643f34619cf3746b3af2fe52fba4f51c85619e3b5b20adbb2a1bc5",
-      "bytes": 2116,
+      "sha256": "8e50558a3ef0d87023186cd6dfa0a4adf04d80b7b68fd8343b67741f8d6a9ab8",
+      "bytes": 2151,
       "line_count": 37,
       "selection": null
     },
     {
       "path": "docs/review/release-v0.2.1/evidence.md",
-      "sha256": "3b99e9085540ba52503bbe978cb2751b453061cadb76a48439ad2db7f0b30ec4",
+      "sha256": "290fb91ba4a95bfac75214adf62a37c1c4243d333c5edfe6f973f81fb3895698",
       "bytes": 2152,
       "line_count": 19,
       "selection": null
@@ -114,9 +114,9 @@
     },
     {
       "path": ".github/workflows/ci.yml",
-      "sha256": "5926b20a47b4932d37499218dcf076b0eface93aa264caa712951fab452952f9",
-      "bytes": 3646,
-      "line_count": 73,
+      "sha256": "74517a731483f398d226c20d56369e319285235a2edd365bf0c031d665aac5e1",
+      "bytes": 3944,
+      "line_count": 79,
       "selection": null
     },
     {
@@ -174,27 +174,25 @@
   "output": {
     "verdict": "READY",
     "claim_status": "positive",
-    "summary": "All bounded pre-publicization gates are supported; no material defect is shown.",
+    "summary": "All required pre-publicization Rust, hardware, Arch, consumer, and packaging checks are evidenced. The native release claim is supported with Flatpak and post-push claims bounded as stated.",
     "material_defects": [],
     "evidence_gaps": [
-      "Flatpak builder/runtime behavior is unverified by design.",
-      "Public v0.2.1 tag and release-asset readback are deferred post-push."
+      "Flatpak build and runtime behavior are intentionally unverified.",
+      "Public push, tag, installer, and release-asset readback are post-push gates."
     ],
     "supported_claims": [
-      "Rust tests, formatting, clippy, and release build pass.",
-      "VAAPI/NVENC capability checks, render-node override, fallback policy, and observability pass.",
-      "Atomic output, Dolphin menu migration, queue/watch propagation, and target-size rate preservation pass.",
-      "The pinned Arch recipe builds media-studio 0.2.1.",
-      "Flatpak syntax, source pin, wrappers, and limitation statement are validated."
+      "VAAPI/NVENC capability checks, render-node override, observable fallback, and fail-closed behavior passed.",
+      "Arch packaging and representative Dolphin, atomic-output, queue, watch, and migration checks passed.",
+      "Portable CI safely handles missing makepkg and verifies the fetched pinned source."
     ],
     "prohibited_claims": [
-      "Flatpak build or runtime readiness.",
-      "Public v0.2.1 installer or release-asset availability."
+      "Do not claim Flatpak production or sandboxed-release readiness.",
+      "Do not claim v0.2.1 public assets or tag availability before push."
     ],
     "required_changes": [],
     "residual_risks": [
-      "Flatpak remains experimental host integration only.",
-      "Post-push publication checks remain outstanding."
+      "Packaging sources are intentionally pinned to implementation commit 63dc708 rather than candidate digest ac414f4.",
+      "Hardware results are representative, not universal across hosts."
     ]
   }
 }

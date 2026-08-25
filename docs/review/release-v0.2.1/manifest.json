@@ -2,7 +2,7 @@
   "schema_version": 1,
   "generation": "2026-08-25T07:42:00Z",
   "candidate": "media-studio-v0.2.1",
-  "candidate_digest": "4b44fce7c1001760b2c57b386476f6532981b6df",
+  "candidate_digest": "ac414f4b1baf6c86faaa69d01cdb61542d1000c7",
   "digest_method": "canonical candidate git commit SHA; packaging sources are pinned to implementation commit 63dc708153b76ab7f7527579f103ce24ac106872",
   "contract": "Implement v0.2.1 with capability-aware VAAPI/NVENC profiles, Arch packaging, and an explicitly experimental Flatpak host-integration manifest without regressing Dolphin, atomic output, queue, watch, or public install behavior.",
   "acceptance_criteria": [
@@ -33,5 +33,5 @@
     "LICENSE"
   ],
   "consumer": "KDE Dolphin service menus and local user-systemd media conversion runtime",
-  "provenance": "candidate content derived from public main at b73c690, implementation commit 63dc708, packaging-pin commit 7e9f5b0, legacy-menu migration commit e235918, and pinned-source CI commit 4b44fce; previous REVISE verdicts are retained as history and are not treated as proof"
+  "provenance": "candidate content derived from public main at b73c690, implementation commit 63dc708, packaging-pin commit 7e9f5b0, legacy-menu migration commit e235918, pinned-source CI commit 4b44fce, portable-CI fixes a25dac1 and ac414f4; previous REVISE verdicts are retained as history and are not treated as proof"
 }

@@ -1,7 +1,7 @@
 {
-  "claim": "Media Studio v0.2.1 candidate commit 4b44fce7c1001760b2c57b386476f6532981b6df is ready for native Arch/Dolphin/user-systemd release: VAAPI/NVENC capability checks are fail-closed and observable, config and environment fallback policy is honored through queue and watch units, target-size fallback preserves rate controls, atomic output and existing menus are retained with reversible legacy migration, the stable Arch package recipe builds media-studio 0.2.1, and packaging is bounded to an explicitly experimental wrapper-backed Flatpak manifest. This is a pre-publicization review; the v0.2.1 tag is intentionally not pushed yet.",
+  "claim": "Media Studio v0.2.1 native release remains ready after the post-push portable CI fix in candidate commit ac414f4b1baf6c86faaa69d01cdb61542d1000c7: release behavior and Arch/Dolphin/user-systemd consumer proof remain unchanged, packaging CI safely handles Ubuntu without makepkg and fetches the pinned source before verification, while Flatpak remains explicitly experimental and runtime-unverified.",
   "effect_state": "request_ready",
-  "effective_request_sha256": "a952451e6c5497283d7af267025ec2334949eb19f6e476f5910c2d1a3506fe50",
+  "effective_request_sha256": "5f1287ed1f8968c94f5ef6642984dbeca9a3da2b7c4f1cb66bea9feaeb1b6103",
   "endpoint": "https://antigravity.quantumind.ru/v1/responses",
   "images": [],
   "model_preference": [
@@ -11,23 +11,23 @@
   "prompt_path": "docs/review/release-v0.2.1/prompt.md",
   "prompt_sha256": "6abc1e7bb222004c6e964e41d83e2013b1f07c17ed4db8038a5ae4415d59ceaf",
   "reasoning_effort_requested": "max",
-  "request_sha256": "a952451e6c5497283d7af267025ec2334949eb19f6e476f5910c2d1a3506fe50",
-  "review_input_sha256": "310c7326df76b135f3d5d401adb5984ff42495c5a8122830515718b0a7bb3cdf",
+  "request_sha256": "5f1287ed1f8968c94f5ef6642984dbeca9a3da2b7c4f1cb66bea9feaeb1b6103",
+  "review_input_sha256": "63a59170c5c80b70cc6c39a60c2b04218a4b7e276115ea58699855c53aa0ddc3",
   "schema_version": 1,
   "sources": [
     {
-      "bytes": 2116,
+      "bytes": 2151,
       "line_count": 37,
       "path": "docs/review/release-v0.2.1/manifest.json",
       "selection": null,
-      "sha256": "054b0855b4643f34619cf3746b3af2fe52fba4f51c85619e3b5b20adbb2a1bc5"
+      "sha256": "8e50558a3ef0d87023186cd6dfa0a4adf04d80b7b68fd8343b67741f8d6a9ab8"
     },
     {
       "bytes": 2152,
       "line_count": 19,
       "path": "docs/review/release-v0.2.1/evidence.md",
       "selection": null,
-      "sha256": "3b99e9085540ba52503bbe978cb2751b453061cadb76a48439ad2db7f0b30ec4"
+      "sha256": "290fb91ba4a95bfac75214adf62a37c1c4243d333c5edfe6f973f81fb3895698"
     },
     {
       "bytes": 938,
@@ -107,11 +107,11 @@
       "sha256": "10536beb3e1291ab05f21958c1b57c2faeab07ec8bdf3ca6261ce9910f3bdfb4"
     },
     {
-      "bytes": 3646,
-      "line_count": 73,
+      "bytes": 3944,
+      "line_count": 79,
       "path": ".github/workflows/ci.yml",
       "selection": null,
-      "sha256": "5926b20a47b4932d37499218dcf076b0eface93aa264caa712951fab452952f9"
+      "sha256": "74517a731483f398d226c20d56369e319285235a2edd365bf0c031d665aac5e1"
     },
     {
       "bytes": 1756,
@@ -164,7 +164,7 @@
     }
   ],
   "stream": false,
-  "submitted_at_unix_ms": 1787636735728,
+  "submitted_at_unix_ms": 1787637482847,
   "timeout_seconds": 900,
   "transport": "json"
 }

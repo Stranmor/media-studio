@@ -17,7 +17,7 @@ Return material defects first, then bounded risks and a concise verdict.
 
 # Exact claim under review
 
-Media Studio v0.2.1 candidate commit 4b44fce7c1001760b2c57b386476f6532981b6df is ready for native Arch/Dolphin/user-systemd release: VAAPI/NVENC capability checks are fail-closed and observable, config and environment fallback policy is honored through queue and watch units, target-size fallback preserves rate controls, atomic output and existing menus are retained with reversible legacy migration, the stable Arch package recipe builds media-studio 0.2.1, and packaging is bounded to an explicitly experimental wrapper-backed Flatpak manifest. This is a pre-publicization review; the v0.2.1 tag is intentionally not pushed yet.
+Media Studio v0.2.1 native release remains ready after the post-push portable CI fix in candidate commit ac414f4b1baf6c86faaa69d01cdb61542d1000c7: release behavior and Arch/Dolphin/user-systemd consumer proof remain unchanged, packaging CI safely handles Ubuntu without makepkg and fetches the pinned source before verification, while Flatpak remains explicitly experimental and runtime-unverified.
 
 # Exact bound sources
 
@@ -26,7 +26,7 @@ Media Studio v0.2.1 candidate commit 4b44fce7c1001760b2c57b386476f6532981b6df is
   "schema_version": 1,
   "generation": "2026-08-25T07:42:00Z",
   "candidate": "media-studio-v0.2.1",
-  "candidate_digest": "4b44fce7c1001760b2c57b386476f6532981b6df",
+  "candidate_digest": "ac414f4b1baf6c86faaa69d01cdb61542d1000c7",
   "digest_method": "canonical candidate git commit SHA; packaging sources are pinned to implementation commit 63dc708153b76ab7f7527579f103ce24ac106872",
   "contract": "Implement v0.2.1 with capability-aware VAAPI/NVENC profiles, Arch packaging, and an explicitly experimental Flatpak host-integration manifest without regressing Dolphin, atomic output, queue, watch, or public install behavior.",
   "acceptance_criteria": [
@@ -57,16 +57,16 @@ Media Studio v0.2.1 candidate commit 4b44fce7c1001760b2c57b386476f6532981b6df is
     "LICENSE"
   ],
   "consumer": "KDE Dolphin service menus and local user-systemd media conversion runtime",
-  "provenance": "candidate content derived from public main at b73c690, implementation commit 63dc708, packaging-pin commit 7e9f5b0, legacy-menu migration commit e235918, and pinned-source CI commit 4b44fce; previous REVISE verdicts are retained as history and are not treated as proof"
+  "provenance": "candidate content derived from public main at b73c690, implementation commit 63dc708, packaging-pin commit 7e9f5b0, legacy-menu migration commit e235918, pinned-source CI commit 4b44fce, portable-CI fixes a25dac1 and ac414f4; previous REVISE verdicts are retained as history and are not treated as proof"
 }
 
 --- END docs/review/release-v0.2.1/manifest.json ---
-[bound full-file sha256: 054b0855b4643f34619cf3746b3af2fe52fba4f51c85619e3b5b20adbb2a1bc5]
+[bound full-file sha256: 8e50558a3ef0d87023186cd6dfa0a4adf04d80b7b68fd8343b67741f8d6a9ab8]
 
 --- BEGIN docs/review/release-v0.2.1/evidence.md (full file) ---
 # Candidate evidence
 
-Evidence is bounded to candidate commit `4b44fce7c1001760b2c57b386476f6532981b6df`; package sources resolve implementation commit `63dc708153b76ab7f7527579f103ce24ac106872`.
+Evidence is bounded to candidate commit `ac414f4b1baf6c86faaa69d01cdb61542d1000c7`; package sources resolve implementation commit `63dc708153b76ab7f7527579f103ce24ac106872`.
 
 - Rust formatting passed with isolated rustfmt configuration.
 - `cargo test --all-targets`: 14 passed, 0 failed.
@@ -85,7 +85,7 @@ Evidence is bounded to candidate commit `4b44fce7c1001760b2c57b386476f6532981b6d
 - Public `v0.2.0` remains the last published consumer; v0.2.1 is not pushed until the fresh review is positive.
 
 --- END docs/review/release-v0.2.1/evidence.md ---
-[bound full-file sha256: 3b99e9085540ba52503bbe978cb2751b453061cadb76a48439ad2db7f0b30ec4]
+[bound full-file sha256: 290fb91ba4a95bfac75214adf62a37c1c4243d333c5edfe6f973f81fb3895698]
 
 --- BEGIN Cargo.toml (full file) ---
 [package]
@@ -3770,19 +3770,25 @@ jobs:
         run: |
           set -euo pipefail
           bash -n packaging/arch/PKGBUILD
-          (cd packaging/arch && makepkg --packagelist | grep -F 'media-studio-0.2.1-1-')
+          if command -v makepkg >/dev/null 2>&1; then
+            (cd packaging/arch && makepkg --packagelist | grep -F 'media-studio-0.2.1-1-')
+          else
+            grep -F 'pkgname=media-studio' packaging/arch/PKGBUILD
+            grep -F 'pkgver=0.2.1' packaging/arch/PKGBUILD
+          fi
           ruby -e 'require "yaml"; manifest = YAML.load_file("packaging/flatpak/io.github.stranmor.MediaStudio.yml"); abort "bad app id" unless manifest["app-id"] == "io.github.stranmor.MediaStudio"; abort "missing candidate commit" unless manifest.dig("modules", 0, "sources", 0, "commit") == "63dc708153b76ab7f7527579f103ce24ac106872"'
           cargo metadata --no-deps --format-version 1 >/dev/null
           test -s packaging/flatpak/io.github.stranmor.MediaStudio.desktop
           test -x packaging/flatpak/host-tool-wrapper
           grep -F 'for tool in ffmpeg ffprobe magick systemd-run systemctl kbuildsycoca6 kbuildsycoca5 zenity kdialog; do ln -s media-studio-host-tool /app/bin/$tool; done' packaging/flatpak/io.github.stranmor.MediaStudio.yml
+          git fetch --no-tags --depth=1 origin 63dc708153b76ab7f7527579f103ce24ac106872
           git cat-file -e 63dc708153b76ab7f7527579f103ce24ac106872:Cargo.toml
           git show 63dc708153b76ab7f7527579f103ce24ac106872:Cargo.toml | grep -F 'version = "0.2.1"'
           git cat-file -e 63dc708153b76ab7f7527579f103ce24ac106872:packaging/flatpak/host-tool-wrapper
           git cat-file -e 63dc708153b76ab7f7527579f103ce24ac106872:packaging/flatpak/io.github.stranmor.MediaStudio.desktop
 
 --- END .github/workflows/ci.yml ---
-[bound full-file sha256: 5926b20a47b4932d37499218dcf076b0eface93aa264caa712951fab452952f9]
+[bound full-file sha256: 74517a731483f398d226c20d56369e319285235a2edd365bf0c031d665aac5e1]
 
 --- BEGIN .github/workflows/release.yml (full file) ---
 name: Release

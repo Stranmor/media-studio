@@ -1,6 +1,6 @@
 # Candidate evidence
 
-Evidence is bounded to candidate commit `4b44fce7c1001760b2c57b386476f6532981b6df`; package sources resolve implementation commit `63dc708153b76ab7f7527579f103ce24ac106872`.
+Evidence is bounded to candidate commit `ac414f4b1baf6c86faaa69d01cdb61542d1000c7`; package sources resolve implementation commit `63dc708153b76ab7f7527579f103ce24ac106872`.
 
 - Rust formatting passed with isolated rustfmt configuration.
 - `cargo test --all-targets`: 14 passed, 0 failed.
@@ -16,4 +16,6 @@ Evidence is bounded to candidate commit `4b44fce7c1001760b2c57b386476f6532981b6d
 - Legacy menu migration: isolated install moved a pre-existing `media-studio.desktop` to `servicemenus/disabled/`, and isolated uninstall restored it byte-for-byte.
 - Arch packaging: project `makepkg --packagelist` parses the stable `media-studio` PKGBUILD; archive-based build of the same package recipe produced `media-studio-0.2.1-1-x86_64.pkg.tar.zst`; `pacman -Qip` confirms version 0.2.1-1 and dependencies `ffmpeg kio systemd`.
 - Flatpak: YAML/app-id/source-commit validation, wrapper shell validation, and explicit `flatpak-spawn --host` wrapper contract passed. `flatpak-builder` is unavailable locally, so Flatpak runtime/build readiness remains explicitly unclaimed.
-- Public `v0.2.0` remains the last published consumer; v0.2.1 is not pushed until the fresh review is positive.
+- Public install proof: `install.sh` fetched from GitHub `main`, downloaded the latest `media-studio-linux-x86_64` asset, verified its SHA-256, installed `media-studio 0.2.1` into an isolated HOME, and created exactly 3 Dolphin menus; doctor reported VAAPI and NVENC capability.
+- GitHub Release `v0.2.1`: release workflow `32814561241` succeeded for x86_64 and aarch64; the release exposes 10 binary/package assets, and the downloaded x86_64 asset checksum and `--version` readback passed.
+- GitHub main CI after portable packaging fix: workflow `32814908711` succeeded for Rust, KDE/Dolphin smoke, and packaging validation.
