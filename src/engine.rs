@@ -23,7 +23,10 @@ pub fn convert(
     log: &Path,
 ) -> Result<Converted> {
     if !input.is_file() {
-        bail!("входной объект не является обычным файлом: {}", input.display());
+        bail!(
+            "входной объект не является обычным файлом: {}",
+            input.display()
+        );
     }
     if let Some(parent) = output.parent() {
         fs::create_dir_all(parent)?;
@@ -36,7 +39,10 @@ pub fn convert(
         .append(true)
         .open(log)
         .with_context(|| format!("не удалось открыть лог {}", log.display()))?;
-    let extension = output.extension().and_then(|value| value.to_str()).unwrap_or("tmp");
+    let extension = output
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("tmp");
     let temp = Builder::new()
         .prefix(".media-studio-")
         .suffix(&format!(".part.{extension}"))
@@ -52,10 +58,16 @@ pub fn convert(
         other => bail!("неподдерживаемый engine: {other}"),
     }?;
     if !status.success() {
-        bail!("конвертация завершилась с кодом {status}; подробности: {}", log.display());
+        bail!(
+            "конвертация завершилась с кодом {status}; подробности: {}",
+            log.display()
+        );
     }
     if !temp_path.is_file() || fs::metadata(&temp_path)?.len() == 0 {
-        bail!("движок завершился успешно, но временный результат пуст: {}", temp_path.display());
+        bail!(
+            "движок завершился успешно, но временный результат пуст: {}",
+            temp_path.display()
+        );
     }
     if config.verify_results {
         verify(profile, &temp_path, &mut log_file)?;
@@ -63,13 +75,20 @@ pub fn convert(
     let actual_output = persist_output(temp, output, overwrite)?;
     writeln!(log_file, "OUTPUT_COMMITTED={}", actual_output.display())?;
     writeln!(log_file, "RESULT=verified")?;
-    Ok(Converted { output: actual_output, log: log.to_path_buf() })
+    Ok(Converted {
+        output: actual_output,
+        log: log.to_path_buf(),
+    })
 }
 
 fn persist_output(temp: NamedTempFile, requested: &Path, overwrite: bool) -> Result<PathBuf> {
     if overwrite {
         temp.persist(requested).map_err(|error| {
-            anyhow::anyhow!("не удалось атомарно заменить {}: {}", requested.display(), error.error)
+            anyhow::anyhow!(
+                "не удалось атомарно заменить {}: {}",
+                requested.display(),
+                error.error
+            )
         })?;
         return Ok(requested.to_path_buf());
     }
@@ -78,8 +97,14 @@ fn persist_output(temp: NamedTempFile, requested: &Path, overwrite: bool) -> Res
         let candidate = if index == 0 {
             requested.to_path_buf()
         } else {
-            let stem = requested.file_stem().and_then(|value| value.to_str()).unwrap_or("output");
-            let extension = requested.extension().and_then(|value| value.to_str()).unwrap_or("bin");
+            let stem = requested
+                .file_stem()
+                .and_then(|value| value.to_str())
+                .unwrap_or("output");
+            let extension = requested
+                .extension()
+                .and_then(|value| value.to_str())
+                .unwrap_or("bin");
             requested
                 .parent()
                 .unwrap_or_else(|| Path::new("."))
@@ -89,17 +114,20 @@ fn persist_output(temp: NamedTempFile, requested: &Path, overwrite: bool) -> Res
             Ok(_) => return Ok(candidate),
             Err(error) if error.error.kind() == std::io::ErrorKind::AlreadyExists => {
                 temp = error.file;
-            },
+            }
             Err(error) => {
                 return Err(anyhow::anyhow!(
                     "не удалось атомарно сохранить {}: {}",
                     candidate.display(),
                     error.error
                 ));
-            },
+            }
         }
     }
-    bail!("не удалось зарезервировать свободное имя результата рядом с {}", requested.display())
+    bail!(
+        "не удалось зарезервировать свободное имя результата рядом с {}",
+        requested.display()
+    )
 }
 
 fn run_ffmpeg(
@@ -138,13 +166,18 @@ fn run_ffmpeg_target(
     let mut last_status = None;
     for attempt in 1..=5 {
         let args = target_args(&profile.args, video_kbps, audio_kbps);
-        writeln!(log, "TARGET_ATTEMPT={attempt} TARGET_MB={target_mb} VIDEO_KBPS={video_kbps:.0}")?;
+        writeln!(
+            log,
+            "TARGET_ATTEMPT={attempt} TARGET_MB={target_mb} VIDEO_KBPS={video_kbps:.0}"
+        )?;
         let status = run_ffmpeg_once(config, profile, input, temp, log, args)?;
         last_status = Some(status);
         if !status.success() {
             return Ok(status);
         }
-        let actual = fs::metadata(temp).map(|meta| meta.len()).unwrap_or(u64::MAX);
+        let actual = fs::metadata(temp)
+            .map(|meta| meta.len())
+            .unwrap_or(u64::MAX);
         if actual <= target_bytes {
             writeln!(log, "TARGET_RESULT=ok ACTUAL_BYTES={actual}")?;
             return Ok(status);
@@ -197,7 +230,11 @@ fn select_hardware_args(
         return Ok(args);
     }
     if config.hardware_fallback && !profile.fallback_args.is_empty() {
-        writeln!(log, "HARDWARE={} unavailable; using software fallback", backend.label())?;
+        writeln!(
+            log,
+            "HARDWARE={} unavailable; using software fallback",
+            backend.label()
+        )?;
         return Ok(if profile.target_size_mb.is_some() {
             preserve_rate_flags(&profile.fallback_args, &args)
         } else {
@@ -228,7 +265,10 @@ fn hardware_available(backend: &HardwareBackend) -> bool {
         HardwareBackend::Nvenc => runtime::required("ffmpeg")
             .ok()
             .and_then(|ffmpeg| {
-                Command::new(ffmpeg).args(["-hide_banner", "-encoders"]).output().ok()
+                Command::new(ffmpeg)
+                    .args(["-hide_banner", "-encoders"])
+                    .output()
+                    .ok()
             })
             .map(|output| String::from_utf8_lossy(&output.stdout).contains("h264_nvenc"))
             .unwrap_or(false),
@@ -247,7 +287,13 @@ fn invoke_ffmpeg(
     command
         .args(["-hide_banner", "-nostdin", "-y", "-loglevel", "error", "-i"])
         .arg(input)
-        .args(["-filter_threads", "1", "-filter_complex_threads", "1", "-threads"])
+        .args([
+            "-filter_threads",
+            "1",
+            "-filter_complex_threads",
+            "1",
+            "-threads",
+        ])
         .arg(config.ffmpeg_threads.to_string())
         .args(expanded.iter().map(String::as_str));
     if !args.iter().any(|arg| arg == "{output}") {
@@ -256,7 +302,10 @@ fn invoke_ffmpeg(
     writeln!(log, "COMMAND=ffmpeg {:?}", command)?;
     let log_out = log.try_clone()?;
     let log_err = log.try_clone()?;
-    Ok(command.stdout(Stdio::from(log_out)).stderr(Stdio::from(log_err)).status()?)
+    Ok(command
+        .stdout(Stdio::from(log_out))
+        .stderr(Stdio::from(log_err))
+        .status()?)
 }
 
 fn target_args(base: &[String], video_kbps: f64, audio_kbps: f64) -> Vec<String> {
@@ -332,7 +381,10 @@ fn run_magick(
     writeln!(log, "COMMAND=magick {:?}", command)?;
     let log_out = log.try_clone()?;
     let log_err = log.try_clone()?;
-    Ok(command.stdout(Stdio::from(log_out)).stderr(Stdio::from(log_err)).status()?)
+    Ok(command
+        .stdout(Stdio::from(log_out))
+        .stderr(Stdio::from(log_err))
+        .status()?)
 }
 
 fn expanded_args(args: &[String], input: &Path, output: &Path) -> Vec<String> {
@@ -364,7 +416,14 @@ fn verify(profile: &Profile, output: &Path, log: &mut File) -> Result<()> {
                 bail!("ffprobe не подтвердил результат: {}", output.display());
             }
             let decode = Command::new(runtime::required("ffmpeg")?)
-                .args(["-hide_banner", "-nostdin", "-loglevel", "error", "-xerror", "-i"])
+                .args([
+                    "-hide_banner",
+                    "-nostdin",
+                    "-loglevel",
+                    "error",
+                    "-xerror",
+                    "-i",
+                ])
                 .arg(output)
                 .args(["-map", "0:v?", "-map", "0:a?", "-f", "null", "-"])
                 .output()
@@ -373,7 +432,7 @@ fn verify(profile: &Profile, output: &Path, log: &mut File) -> Result<()> {
             if !decode.status.success() {
                 bail!("полное декодирование результата завершилось с ошибкой");
             }
-        },
+        }
         "magick" => {
             let check = Command::new(runtime::required("magick")?)
                 .args(["identify", "-quiet"])
@@ -384,7 +443,7 @@ fn verify(profile: &Profile, output: &Path, log: &mut File) -> Result<()> {
             if !check.status.success() {
                 bail!("ImageMagick не подтвердил результат: {}", output.display());
             }
-        },
+        }
         _ => bail!("нельзя проверить неизвестный engine"),
     }
     Ok(())
@@ -392,11 +451,21 @@ fn verify(profile: &Profile, output: &Path, log: &mut File) -> Result<()> {
 
 pub fn inspect(input: &Path, json: bool) -> Result<String> {
     if !input.is_file() {
-        bail!("файл не найден или это не обычный файл: {}", input.display());
+        bail!(
+            "файл не найден или это не обычный файл: {}",
+            input.display()
+        );
     }
     if json {
         let output = Command::new(runtime::required("ffprobe")?)
-            .args(["-v", "error", "-show_format", "-show_streams", "-of", "json"])
+            .args([
+                "-v",
+                "error",
+                "-show_format",
+                "-show_streams",
+                "-of",
+                "json",
+            ])
             .arg(input)
             .output()
             .context("не удалось запустить ffprobe")?;

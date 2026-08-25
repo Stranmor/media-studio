@@ -21,7 +21,10 @@ pub fn notify(title: &str, body: &str) {
             .stdout(Stdio::null())
             .stderr(Stdio::null())
             .status();
-        if notify_status.map(|status| status.success()).unwrap_or(false) {
+        if notify_status
+            .map(|status| status.success())
+            .unwrap_or(false)
+        {
             return;
         }
     }
@@ -52,7 +55,10 @@ fn choose_with_zenity(config: &Config) -> Result<AdvancedSelection> {
         .iter()
         .map(|(id, profile)| format!("{id} — {} / {}", profile.category, profile.label))
         .collect::<Vec<_>>();
-    let first = values.first().cloned().unwrap_or_else(|| config.default_profile.clone());
+    let first = values
+        .first()
+        .cloned()
+        .unwrap_or_else(|| config.default_profile.clone());
     let profile_values = values.join("|");
     let output = Command::new(runtime::required("zenity")?)
         .args([
@@ -89,18 +95,32 @@ fn choose_with_zenity(config: &Config) -> Result<AdvancedSelection> {
         .map(str::to_string)
         .collect::<Vec<_>>();
     let selected = fields.first().cloned().unwrap_or(first);
-    let profile = selected.split(" — ").next().unwrap_or(&selected).to_string();
+    let profile = selected
+        .split(" — ")
+        .next()
+        .unwrap_or(&selected)
+        .to_string();
     if !config.profiles.contains_key(&profile) {
         bail!("Диалог вернул неизвестный профиль: {profile}");
     }
-    let target_size_mb =
-        fields.get(1).and_then(|value| value.trim().parse::<u64>().ok()).filter(|value| *value > 0);
-    let overwrite = fields.get(2).map(|value| value.eq_ignore_ascii_case("true")).unwrap_or(false);
+    let target_size_mb = fields
+        .get(1)
+        .and_then(|value| value.trim().parse::<u64>().ok())
+        .filter(|value| *value > 0);
+    let overwrite = fields
+        .get(2)
+        .map(|value| value.eq_ignore_ascii_case("true"))
+        .unwrap_or(false);
     let hardware_fallback = fields
         .get(3)
         .map(|value| value.eq_ignore_ascii_case("true"))
         .unwrap_or(config.hardware_fallback);
-    Ok(AdvancedSelection { profile, target_size_mb, overwrite, hardware_fallback })
+    Ok(AdvancedSelection {
+        profile,
+        target_size_mb,
+        overwrite,
+        hardware_fallback,
+    })
 }
 
 fn choose_with_kdialog(config: &Config) -> Result<AdvancedSelection> {
@@ -136,12 +156,23 @@ fn choose_with_kdialog(config: &Config) -> Result<AdvancedSelection> {
         .filter(|value| *value > 0);
     let overwrite = kdialog_yesno("Перезаписать существующие результаты?")?;
     let hardware_fallback = kdialog_yesno("Разрешить software fallback для VAAPI/NVENC?")?;
-    Ok(AdvancedSelection { profile, target_size_mb, overwrite, hardware_fallback })
+    Ok(AdvancedSelection {
+        profile,
+        target_size_mb,
+        overwrite,
+        hardware_fallback,
+    })
 }
 
 fn kdialog_inputbox(prompt: &str, initial: &str) -> Result<String> {
     let output = Command::new(runtime::required("kdialog")?)
-        .args(["--title", "Media Studio — расширенные настройки", "--inputbox", prompt, initial])
+        .args([
+            "--title",
+            "Media Studio — расширенные настройки",
+            "--inputbox",
+            prompt,
+            initial,
+        ])
         .output()
         .context("не удалось открыть поле ввода KDialog")?;
     if !output.status.success() {
@@ -152,7 +183,12 @@ fn kdialog_inputbox(prompt: &str, initial: &str) -> Result<String> {
 
 fn kdialog_yesno(prompt: &str) -> Result<bool> {
     let status = Command::new(runtime::required("kdialog")?)
-        .args(["--title", "Media Studio — расширенные настройки", "--yesno", prompt])
+        .args([
+            "--title",
+            "Media Studio — расширенные настройки",
+            "--yesno",
+            prompt,
+        ])
         .status()
         .context("не удалось открыть подтверждение KDialog")?;
     if status.code() == Some(1) {
@@ -170,6 +206,8 @@ pub fn show_info(title: &str, body: &str) {
             .args(["--info", "--title", title, "--text", body, "--width", "760"])
             .status();
     } else if let Some(kdialog) = runtime::optional("kdialog") {
-        let _ = Command::new(kdialog).args(["--title", title, "--msgbox", body]).status();
+        let _ = Command::new(kdialog)
+            .args(["--title", title, "--msgbox", body])
+            .status();
     }
 }

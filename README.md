@@ -17,7 +17,7 @@ Media Studio — локальный конвертер медиа для KDE Dol
 
 ## Установка
 
-Нужны `ffmpeg`, `ffprobe`, `systemd-run`, `systemctl`, `kbuildsycoca6` и один диалоговый backend: `zenity` или `kdialog`. Для image-профилей нужен `magick`.
+Нужны `ffmpeg`, `ffprobe`, `systemd-run`, `systemctl`, `kbuildsycoca6` или `kbuildsycoca5` и один диалоговый backend: `zenity` или `kdialog`. Для image-профилей нужен `magick`.
 `zenity` показывает все расширенные параметры одной формой; `kdialog` использует последовательные окна с теми же параметрами.
 
 ```bash
@@ -41,7 +41,7 @@ curl --fail --location https://raw.githubusercontent.com/Stranmor/media-studio/m
 - config: `~/.config/media-studio/config.toml`;
 - job state: `~/.local/state/media-studio/jobs/`.
 
-Переиндексация KDE выполняется автоматически через `kbuildsycoca6`.
+Переиндексация KDE выполняется автоматически через доступный `kbuildsycoca6` или `kbuildsycoca5`.
 Каждое меню содержит только совместимые с MIME-группой действия; generic `desktop-file-validate` может ругаться на KDE-расширения `Service`/`Actions`, хотя KDE KIO их принимает.
 
 ## Использование в Dolphin
@@ -125,6 +125,6 @@ cargo test
 cargo build --release
 ```
 
-CI дополнительно запускает KDE smoke-test с `kbuildsycoca6`, Dolphin service menus, ImageMagick/FFmpeg fixture и реальной проверкой результата через `ffprobe`.
+CI дополнительно запускает KDE smoke-test с KDE cache builder, Dolphin service menus, ImageMagick/FFmpeg fixture и реальной проверкой результата через `ffprobe`.
 
 Архитектура: [D2 map](docs/media-studio.svg). Правила contribution: [CONTRIBUTING.md](CONTRIBUTING.md). Security policy: [SECURITY.md](SECURITY.md).

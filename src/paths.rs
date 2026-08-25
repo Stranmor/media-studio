@@ -38,10 +38,14 @@ pub fn service_menu_dir() -> PathBuf {
 }
 
 pub fn service_menu_paths() -> Vec<PathBuf> {
-    ["media-studio-video.desktop", "media-studio-audio.desktop", "media-studio-image.desktop"]
-        .into_iter()
-        .map(|name| service_menu_dir().join(name))
-        .collect()
+    [
+        "media-studio-video.desktop",
+        "media-studio-audio.desktop",
+        "media-studio-image.desktop",
+    ]
+    .into_iter()
+    .map(|name| service_menu_dir().join(name))
+    .collect()
 }
 
 pub fn legacy_service_menu_path() -> PathBuf {
@@ -62,12 +66,15 @@ pub fn watch_service_path(id: &str) -> PathBuf {
 pub fn valid_job_id(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 96
-        && id.bytes().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+        && id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
 }
 
 pub fn normalize_path_arg(raw: &str) -> PathBuf {
-    let decoded =
-        raw.strip_prefix("file://").map(|rest| rest.strip_prefix("localhost").unwrap_or(rest));
+    let decoded = raw
+        .strip_prefix("file://")
+        .map(|rest| rest.strip_prefix("localhost").unwrap_or(rest));
     match decoded {
         Some(value) => PathBuf::from(percent_decode(value)),
         None => PathBuf::from(raw),
@@ -111,10 +118,16 @@ pub fn output_path(
 ) -> PathBuf {
     let parent = output_dir.unwrap_or_else(|| input.parent().unwrap_or_else(|| Path::new(".")));
     let stem = input.file_stem().and_then(OsStr::to_str).unwrap_or("media");
-    let source_ext =
-        input.extension().and_then(OsStr::to_str).unwrap_or("bin").to_ascii_lowercase();
-    let extension =
-        if profile.extension.is_empty() { source_ext.clone() } else { profile.extension.clone() };
+    let source_ext = input
+        .extension()
+        .and_then(OsStr::to_str)
+        .unwrap_or("bin")
+        .to_ascii_lowercase();
+    let extension = if profile.extension.is_empty() {
+        source_ext.clone()
+    } else {
+        profile.extension.clone()
+    };
     let primary = parent.join(format!("{stem}.{extension}"));
     if !overwrite && primary != input && !primary.exists() {
         return primary;
@@ -188,7 +201,11 @@ mod tests {
 
     #[test]
     fn output_path_does_not_equal_input() {
-        let profile = Config::built_in().profiles.get("video_mp4").cloned().expect("profile");
+        let profile = Config::built_in()
+            .profiles
+            .get("video_mp4")
+            .cloned()
+            .expect("profile");
         let input = PathBuf::from("/tmp/example.mp4");
         assert_ne!(output_path(&input, &profile, None, false), input);
     }

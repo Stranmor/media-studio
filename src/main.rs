@@ -18,7 +18,11 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use model::{valid_watch_id, Config, WatchFolder};
 
 #[derive(Debug, Parser)]
-#[command(name = "media-studio", version, about = "Media Studio — конвертация медиа из Dolphin")]
+#[command(
+    name = "media-studio",
+    version,
+    about = "Media Studio — конвертация медиа из Dolphin"
+)]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
@@ -167,8 +171,13 @@ fn run() -> Result<()> {
                 choice.overwrite,
                 files,
             )
-        },
-        Commands::Enqueue { profile, target_size_mb, hardware_fallback, files } => {
+        }
+        Commands::Enqueue {
+            profile,
+            target_size_mb,
+            hardware_fallback,
+            files,
+        } => {
             let config = load_config()?;
             require_profile(&config, &profile)?;
             enqueue_with_profile(
@@ -180,7 +189,7 @@ fn run() -> Result<()> {
                 false,
                 files,
             )
-        },
+        }
         Commands::Run {
             job_id,
             profile,
@@ -203,15 +212,17 @@ fn run() -> Result<()> {
             QueueCommand::List => {
                 println!("{}", queue::list()?);
                 Ok(())
-            },
+            }
             QueueCommand::Cancel { job_id } => {
                 queue::cancel(&job_id)?;
                 Ok(())
-            },
+            }
         },
         Commands::Watch { command } => run_watch_command(command),
         Commands::WatchRun { id } => watch_run(&id),
-        Commands::Profile { command: ProfileCommand::List } => {
+        Commands::Profile {
+            command: ProfileCommand::List,
+        } => {
             let config = load_config()?;
             for (id, profile) in config.profiles {
                 println!(
@@ -220,7 +231,7 @@ fn run() -> Result<()> {
                 );
             }
             Ok(())
-        },
+        }
     }
 }
 
@@ -238,13 +249,21 @@ fn enqueue_with_profile(
     files: Vec<String>,
 ) -> Result<()> {
     require_profile(config, profile)?;
-    let mut selected_profile = config.profiles.get(profile).expect("validated profile").clone();
+    let mut selected_profile = config
+        .profiles
+        .get(profile)
+        .expect("validated profile")
+        .clone();
     if target_size_mb.is_some() {
         selected_profile.target_size_mb = target_size_mb;
     }
     engine::ensure_tools(Some(&selected_profile))?;
     let executable = paths::installed_binary_path();
-    let executable = if executable.is_file() { executable } else { std::env::current_exe()? };
+    let executable = if executable.is_file() {
+        executable
+    } else {
+        std::env::current_exe()?
+    };
     let job_id = queue::enqueue(
         &executable,
         profile,
@@ -254,7 +273,10 @@ fn enqueue_with_profile(
         overwrite,
         &files,
     )?;
-    println!("QUEUED job_id={job_id} profile={profile} files={}", files.len());
+    println!(
+        "QUEUED job_id={job_id} profile={profile} files={}",
+        files.len()
+    );
     Ok(())
 }
 
@@ -267,13 +289,20 @@ fn run_job(
     output_dir: Option<PathBuf>,
     raw_files: Vec<String>,
 ) -> Result<()> {
-    anyhow::ensure!(paths::valid_job_id(job_id), "некорректный идентификатор задачи");
+    anyhow::ensure!(
+        paths::valid_job_id(job_id),
+        "некорректный идентификатор задачи"
+    );
     let config = load_config()?;
     require_profile(&config, profile_id)?;
     if raw_files.is_empty() {
         bail!("задача {job_id} не содержит входных файлов");
     }
-    let mut profile = config.profiles.get(profile_id).expect("validated profile").clone();
+    let mut profile = config
+        .profiles
+        .get(profile_id)
+        .expect("validated profile")
+        .clone();
     if target_size_mb.is_some() {
         profile.target_size_mb = target_size_mb;
     }
@@ -284,9 +313,18 @@ fn run_job(
     if let Some(parent) = log.parent() {
         fs::create_dir_all(parent)?;
     }
-    fs::write(&log, format!("JOB_ID={job_id}\nPROFILE={profile_id}\nLABEL={}\n", profile.label))?;
+    fs::write(
+        &log,
+        format!(
+            "JOB_ID={job_id}\nPROFILE={profile_id}\nLABEL={}\n",
+            profile.label
+        ),
+    )?;
     paths::write_job_status(job_id, "running", &[("profile", profile_id.to_string())])?;
-    ui::notify("Media Studio", &format!("Запущена задача {job_id}: {}", profile.label));
+    ui::notify(
+        "Media Studio",
+        &format!("Запущена задача {job_id}: {}", profile.label),
+    );
 
     let mut ok = 0usize;
     let mut failed = 0usize;
@@ -310,7 +348,7 @@ fn run_job(
                     result.output.display(),
                     result.log.display()
                 );
-            },
+            }
             Err(error) => {
                 failed += 1;
                 eprintln!(
@@ -319,7 +357,7 @@ fn run_job(
                     format_error(&error),
                     log.display()
                 );
-            },
+            }
         }
     }
     let state = if failed == 0 {
@@ -347,12 +385,14 @@ fn run_job(
         ],
     )?;
     if failed == 0 {
-        let fallback_note =
-            if fs::read_to_string(&log).unwrap_or_default().contains("HARDWARE_FALLBACK=") {
-                " Аппаратное ускорение недоступно, использован software fallback."
-            } else {
-                ""
-            };
+        let fallback_note = if fs::read_to_string(&log)
+            .unwrap_or_default()
+            .contains("HARDWARE_FALLBACK=")
+        {
+            " Аппаратное ускорение недоступно, использован software fallback."
+        } else {
+            ""
+        };
         let output_note = outputs
             .first()
             .map(|output| format!(" Первый результат: {}.", output.display()))
@@ -372,7 +412,10 @@ fn run_job(
     } else {
         ui::error(
             "Media Studio: частичный результат",
-            &format!("Успешно: {ok}, ошибок: {failed}. Подробности: {}", log.display()),
+            &format!(
+                "Успешно: {ok}, ошибок: {failed}. Подробности: {}",
+                log.display()
+            ),
         );
         bail!("задача завершена с ошибками: успешно {ok}, ошибок {failed}")
     }
@@ -406,7 +449,12 @@ fn require_profile(config: &Config, profile: &str) -> Result<()> {
     if config.profiles.contains_key(profile) {
         return Ok(());
     }
-    let available = config.profiles.keys().cloned().collect::<Vec<_>>().join(", ");
+    let available = config
+        .profiles
+        .keys()
+        .cloned()
+        .collect::<Vec<_>>()
+        .join(", ");
     bail!("неизвестный профиль `{profile}`. Доступны: {available}")
 }
 
@@ -430,8 +478,15 @@ fn run_watch_command(command: WatchCommand) -> Result<()> {
                 }
             }
             Ok(())
-        },
-        WatchCommand::Add { id, source, destination, profile, recursive, settle_seconds } => {
+        }
+        WatchCommand::Add {
+            id,
+            source,
+            destination,
+            profile,
+            recursive,
+            settle_seconds,
+        } => {
             ensure_watch_id(&id)?;
             let mut config = load_config()?;
             let previous = config.clone();
@@ -456,7 +511,11 @@ fn run_watch_command(command: WatchCommand) -> Result<()> {
             config.validate()?;
             config.write(&paths::config_path())?;
             if let Err(error) = install_watch_unit(
-                config.watch_folders.iter().find(|folder| folder.id == id).expect("watch folder"),
+                config
+                    .watch_folders
+                    .iter()
+                    .find(|folder| folder.id == id)
+                    .expect("watch folder"),
             ) {
                 previous.write(&paths::config_path())?;
                 let _ = fs::remove_file(paths::watch_service_path(&id));
@@ -464,7 +523,7 @@ fn run_watch_command(command: WatchCommand) -> Result<()> {
             }
             println!("WATCH_ADDED id={id} state=enabled");
             Ok(())
-        },
+        }
         WatchCommand::Remove { id } => {
             ensure_watch_id(&id)?;
             let mut config = load_config()?;
@@ -474,13 +533,16 @@ fn run_watch_command(command: WatchCommand) -> Result<()> {
             config.watch_folders.retain(|folder| folder.id != id);
             config.write(&paths::config_path())?;
             let unit = format!("media-studio-watch-{id}.service");
-            let _ =
-                required_command("systemctl")?.args(["--user", "disable", "--now", &unit]).status();
+            let _ = required_command("systemctl")?
+                .args(["--user", "disable", "--now", &unit])
+                .status();
             let _ = fs::remove_file(paths::watch_service_path(&id));
-            let _ = required_command("systemctl")?.args(["--user", "daemon-reload"]).status();
+            let _ = required_command("systemctl")?
+                .args(["--user", "daemon-reload"])
+                .status();
             println!("WATCH_REMOVED id={id}");
             Ok(())
-        },
+        }
         WatchCommand::Start { id } => {
             ensure_watch_id(&id)?;
             let mut config = load_config()?;
@@ -495,7 +557,7 @@ fn run_watch_command(command: WatchCommand) -> Result<()> {
             config.write(&paths::config_path())?;
             println!("WATCH_STARTED id={id}");
             Ok(())
-        },
+        }
         WatchCommand::Stop { id } => {
             ensure_watch_id(&id)?;
             let mut config = load_config()?;
@@ -506,7 +568,11 @@ fn run_watch_command(command: WatchCommand) -> Result<()> {
             if !status.success() {
                 bail!("не удалось остановить {unit}");
             }
-            if let Some(folder) = config.watch_folders.iter_mut().find(|folder| folder.id == id) {
+            if let Some(folder) = config
+                .watch_folders
+                .iter_mut()
+                .find(|folder| folder.id == id)
+            {
                 folder.enabled = false;
                 config.write(&paths::config_path())?;
             } else {
@@ -514,7 +580,7 @@ fn run_watch_command(command: WatchCommand) -> Result<()> {
             }
             println!("WATCH_STOPPED id={id}");
             Ok(())
-        },
+        }
     }
 }
 
@@ -535,13 +601,16 @@ fn install_watch_unit(folder: &WatchFolder) -> Result<()> {
     let binary = systemd_quote(&binary);
     let unit = format!("[Unit]\nDescription=Media Studio watch-folder {}\nAfter=graphical-session.target\n\n[Service]\nExecStart={} watch-run --id {}\nRestart=always\nRestartSec=4\n\n[Install]\nWantedBy=default.target\n", folder.id, binary, folder.id);
     paths::atomic_write(&path, unit.as_bytes())?;
-    let reload = required_command("systemctl")?.args(["--user", "daemon-reload"]).status()?;
+    let reload = required_command("systemctl")?
+        .args(["--user", "daemon-reload"])
+        .status()?;
     if !reload.success() {
         bail!("systemd user не принял daemon-reload");
     }
     let unit_name = format!("media-studio-watch-{}.service", folder.id);
-    let enabled =
-        required_command("systemctl")?.args(["--user", "enable", "--now", &unit_name]).status()?;
+    let enabled = required_command("systemctl")?
+        .args(["--user", "enable", "--now", &unit_name])
+        .status()?;
     if !enabled.success() {
         bail!("не удалось включить {unit_name}");
     }
@@ -549,11 +618,20 @@ fn install_watch_unit(folder: &WatchFolder) -> Result<()> {
 }
 
 fn preflight_install() -> Result<()> {
-    let required = ["ffmpeg", "ffprobe", "systemd-run", "systemctl", "kbuildsycoca6"];
-    let missing =
-        required.iter().filter(|tool| find_on_path(tool).is_none()).copied().collect::<Vec<_>>();
+    let required = ["ffmpeg", "ffprobe", "systemd-run", "systemctl"];
+    let missing = required
+        .iter()
+        .filter(|tool| find_on_path(tool).is_none())
+        .copied()
+        .collect::<Vec<_>>();
     if !missing.is_empty() {
-        bail!("нельзя установить Media Studio: отсутствуют {}", missing.join(", "));
+        bail!(
+            "нельзя установить Media Studio: отсутствуют {}",
+            missing.join(", ")
+        );
+    }
+    if kde_cache_builder().is_none() {
+        bail!("нельзя установить Media Studio: отсутствуют kbuildsycoca6 или kbuildsycoca5");
     }
     if find_on_path("zenity").is_none() && find_on_path("kdialog").is_none() {
         bail!("нельзя установить Media Studio: нужен zenity или kdialog для расширенного меню");
@@ -591,7 +669,10 @@ fn watch_run(id: &str) -> Result<()> {
                 Err(_) => continue,
             };
             let modified = metadata.modified().unwrap_or(UNIX_EPOCH);
-            let age = SystemTime::now().duration_since(modified).unwrap_or_default().as_secs();
+            let age = SystemTime::now()
+                .duration_since(modified)
+                .unwrap_or_default()
+                .as_secs();
             if age < folder.settle_seconds {
                 continue;
             }
@@ -675,13 +756,20 @@ fn doctor() -> Result<()> {
     println!("verify_results: {}", config.verify_results);
     println!("ffmpeg_threads: {}", config.ffmpeg_threads);
     let mut missing_core = Vec::new();
-    for tool in ["ffmpeg", "ffprobe", "systemd-run", "systemctl", "kbuildsycoca6"] {
+    for tool in ["ffmpeg", "ffprobe", "systemd-run", "systemctl"] {
         match find_on_path(tool) {
             Some(path) => println!("{tool}: OK ({})", path.display()),
             None => {
                 println!("{tool}: MISSING");
                 missing_core.push(tool);
-            },
+            }
+        }
+    }
+    match kde_cache_builder() {
+        Some(path) => println!("kde_cache_builder: OK ({})", path.display()),
+        None => {
+            println!("kde_cache_builder: MISSING (kbuildsycoca6 or kbuildsycoca5)");
+            missing_core.push("kbuildsycoca6|kbuildsycoca5");
         }
     }
     let dialog_backend = find_on_path("zenity").or_else(|| find_on_path("kdialog"));
@@ -690,7 +778,7 @@ fn doctor() -> Result<()> {
         None => {
             println!("dialog_backend: MISSING (zenity or kdialog)");
             missing_core.push("zenity|kdialog");
-        },
+        }
     }
     for tool in ["magick", "notify-send"] {
         match find_on_path(tool) {
@@ -708,7 +796,10 @@ fn doctor() -> Result<()> {
             .join(", ")
     );
     if !missing_core.is_empty() {
-        bail!("не хватает обязательных инструментов: {}", missing_core.join(", "));
+        bail!(
+            "не хватает обязательных инструментов: {}",
+            missing_core.join(", ")
+        );
     }
     Ok(())
 }
@@ -752,19 +843,28 @@ fn install(force_config: bool) -> Result<()> {
             install_watch_unit(folder)?;
         }
     }
-    let cache = required_command("kbuildsycoca6")?.arg("--noincremental").status();
+    let cache =
+        kde_cache_builder().map(|builder| Command::new(builder).arg("--noincremental").status());
     println!("installed_binary={}", target.display());
     println!("config={}", config_path.display());
     println!(
         "service_menus={}",
-        menu_paths.iter().map(|path| path.display().to_string()).collect::<Vec<_>>().join(",")
+        menu_paths
+            .iter()
+            .map(|path| path.display().to_string())
+            .collect::<Vec<_>>()
+            .join(",")
     );
     println!(
         "kde_cache={}",
         match cache {
-            Ok(status) if status.success() => "updated",
-            Ok(status) => return Err(anyhow::anyhow!("kbuildsycoca6 завершился с кодом {status}")),
-            Err(error) => return Err(error.into()),
+            Some(Ok(status)) if status.success() => "updated",
+            Some(Ok(status)) =>
+                return Err(anyhow::anyhow!(
+                    "KDE cache builder завершился с кодом {status}"
+                )),
+            None => return Err(anyhow::anyhow!("не найден kbuildsycoca6 или kbuildsycoca5")),
+            Some(Err(error)) => return Err(error.into()),
         }
     );
     Ok(())
@@ -773,9 +873,14 @@ fn install(force_config: bool) -> Result<()> {
 fn uninstall(purge: bool) -> Result<()> {
     let mut warnings = Vec::new();
     if let Some(systemctl) = runtime::optional("systemctl") {
-        if let Ok(status) = Command::new(&systemctl).args(["--user", "daemon-reload"]).status() {
+        if let Ok(status) = Command::new(&systemctl)
+            .args(["--user", "daemon-reload"])
+            .status()
+        {
             if !status.success() {
-                warnings.push(format!("первичный daemon-reload завершился с кодом {status}"));
+                warnings.push(format!(
+                    "первичный daemon-reload завершился с кодом {status}"
+                ));
             }
         }
     } else {
@@ -784,20 +889,22 @@ fn uninstall(purge: bool) -> Result<()> {
     if let Ok(entries) = fs::read_dir(paths::systemd_user_dir()) {
         for entry in entries.flatten() {
             let path = entry.path();
-            let Some(name) = path.file_name().and_then(|name| name.to_str()) else { continue };
+            let Some(name) = path.file_name().and_then(|name| name.to_str()) else {
+                continue;
+            };
             if name.starts_with("media-studio-watch-") && name.ends_with(".service") {
                 if let Some(systemctl) = runtime::optional("systemctl") {
                     match Command::new(systemctl)
                         .args(["--user", "disable", "--now", name])
                         .status()
                     {
-                        Ok(status) if status.success() => {},
+                        Ok(status) if status.success() => {}
                         Ok(status) => {
                             warnings.push(format!("не удалось остановить {name}: код {status}"))
-                        },
+                        }
                         Err(error) => {
                             warnings.push(format!("не удалось остановить {name}: {error}"))
-                        },
+                        }
                     }
                 } else {
                     warnings.push(format!("systemctl не найден; unit {name} не остановлен"));
@@ -807,14 +914,17 @@ fn uninstall(purge: bool) -> Result<()> {
         }
     }
     if let Some(systemctl) = runtime::optional("systemctl") {
-        match Command::new(systemctl).args(["--user", "daemon-reload"]).status() {
-            Ok(status) if status.success() => {},
-            Ok(status) => {
-                warnings.push(format!("финальный daemon-reload завершился с кодом {status}"))
-            },
-            Err(error) => {
-                warnings.push(format!("не удалось выполнить финальный daemon-reload: {error}"))
-            },
+        match Command::new(systemctl)
+            .args(["--user", "daemon-reload"])
+            .status()
+        {
+            Ok(status) if status.success() => {}
+            Ok(status) => warnings.push(format!(
+                "финальный daemon-reload завершился с кодом {status}"
+            )),
+            Err(error) => warnings.push(format!(
+                "не удалось выполнить финальный daemon-reload: {error}"
+            )),
         }
     } else {
         warnings.push("systemctl не найден; финальный daemon-reload пропущен".to_string());
@@ -845,22 +955,29 @@ fn uninstall(purge: bool) -> Result<()> {
             fs::remove_dir_all(state_dir)?;
         }
     }
-    let cache = runtime::optional("kbuildsycoca6")
-        .map(|kbuildsycoca6| Command::new(kbuildsycoca6).arg("--noincremental").status());
+    let cache =
+        kde_cache_builder().map(|builder| Command::new(builder).arg("--noincremental").status());
     println!("uninstalled_binary={}", binary.display());
-    println!("uninstalled_service_menus={}", paths::service_menu_dir().display());
+    println!(
+        "uninstalled_service_menus={}",
+        paths::service_menu_dir().display()
+    );
     println!("purged={purge}");
     match cache {
-        Some(Ok(status)) if status.success() => {},
-        Some(Ok(status)) => warnings.push(format!("kbuildsycoca6 завершился с кодом {status}")),
-        None => warnings.push("kbuildsycoca6 не найден; KDE cache не обновлён".to_string()),
+        Some(Ok(status)) if status.success() => {}
+        Some(Ok(status)) => warnings.push(format!("KDE cache builder завершился с кодом {status}")),
+        None => warnings
+            .push("kbuildsycoca6 и kbuildsycoca5 не найдены; KDE cache не обновлён".to_string()),
         Some(Err(error)) => warnings.push(format!("не удалось обновить KDE cache: {error}")),
     }
     if warnings.is_empty() {
         Ok(())
     } else {
         println!("uninstall_state=partial");
-        bail!("удаление завершено с предупреждениями: {}", warnings.join("; "))
+        bail!(
+            "удаление завершено с предупреждениями: {}",
+            warnings.join("; ")
+        )
     }
 }
 
@@ -895,7 +1012,9 @@ fn restore_legacy_menus() -> Result<()> {
     }
     for entry in fs::read_dir(&disabled_dir)?.flatten() {
         let source = entry.path();
-        let Some(name) = source.file_name() else { continue };
+        let Some(name) = source.file_name() else {
+            continue;
+        };
         let target = source_dir.join(name);
         if !target.exists() {
             fs::rename(source, target)?;
@@ -1107,7 +1226,13 @@ fn service_menus(executable: &Path) -> Vec<String> {
             "audio/*;application/ogg;application/x-ogg;audio/ogg;audio/opus;audio/x-opus+ogg;",
             AUDIO_ACTIONS,
         ),
-        service_menu(executable, "Media Studio — Images", "Изображения", "image/*;", IMAGE_ACTIONS),
+        service_menu(
+            executable,
+            "Media Studio — Images",
+            "Изображения",
+            "image/*;",
+            IMAGE_ACTIONS,
+        ),
     ]
 }
 
@@ -1119,7 +1244,11 @@ fn service_menu(
     actions: &[MenuAction],
 ) -> String {
     let exe = desktop_quote(executable);
-    let action_ids = actions.iter().map(|action| action.id).collect::<Vec<_>>().join(";");
+    let action_ids = actions
+        .iter()
+        .map(|action| action.id)
+        .collect::<Vec<_>>()
+        .join(";");
     let mut output = format!(
         "[Desktop Entry]\nType=Service\nServiceTypes=KonqPopupMenu/Plugin\nX-KDE-ServiceTypes=KonqPopupMenu/Plugin\nName={name}\nName[ru]={name_ru}\nMimeType={mime_types}\nActions={action_ids};\nX-KDE-Submenu=Media Studio\nX-KDE-Submenu[ru]=Media Studio\nIcon=applications-multimedia\n"
     );
@@ -1133,17 +1262,27 @@ fn service_menu(
 }
 
 fn desktop_quote(path: &Path) -> String {
-    let raw = path.to_string_lossy().replace('\\', "\\\\").replace('"', "\\\"");
+    let raw = path
+        .to_string_lossy()
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"");
     format!("\"{raw}\"")
 }
 
 fn systemd_quote(path: &Path) -> String {
-    let raw = path.to_string_lossy().replace('\\', "\\\\").replace('"', "\\\"");
+    let raw = path
+        .to_string_lossy()
+        .replace('\\', "\\\\")
+        .replace('"', "\\\"");
     format!("\"{raw}\"")
 }
 
 fn find_on_path(name: &str) -> Option<PathBuf> {
     runtime::optional(name)
+}
+
+fn kde_cache_builder() -> Option<PathBuf> {
+    runtime::optional("kbuildsycoca6").or_else(|| runtime::optional("kbuildsycoca5"))
 }
 
 fn required_command(name: &str) -> Result<Command> {
@@ -1161,7 +1300,10 @@ fn format_error(error: &anyhow::Error) -> String {
 
 #[allow(dead_code)]
 fn _stable_id() -> String {
-    let nanos = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_nanos();
+    let nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_nanos();
     format!("{}-{}", nanos, std::process::id())
 }
 
@@ -1183,7 +1325,10 @@ mod tests {
 
     #[test]
     fn watch_unit_quotes_binary_path() {
-        assert_eq!(systemd_quote(Path::new("/tmp/media studio/bin")), "\"/tmp/media studio/bin\"");
+        assert_eq!(
+            systemd_quote(Path::new("/tmp/media studio/bin")),
+            "\"/tmp/media studio/bin\""
+        );
     }
 
     #[test]

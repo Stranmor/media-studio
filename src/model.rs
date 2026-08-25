@@ -207,8 +207,14 @@ impl Config {
                 "+faststart",
             ],
         );
-        profiles.get_mut("video_mp4_400mb").expect("profile").target_size_mb = Some(400);
-        profiles.get_mut("video_mp4_400mb").expect("profile").target_audio_bitrate_kbps = 128;
+        profiles
+            .get_mut("video_mp4_400mb")
+            .expect("profile")
+            .target_size_mb = Some(400);
+        profiles
+            .get_mut("video_mp4_400mb")
+            .expect("profile")
+            .target_audio_bitrate_kbps = 128;
 
         add(
             &mut profiles,
@@ -241,8 +247,14 @@ impl Config {
                 "+faststart",
             ],
         );
-        profiles.get_mut("video_mp4_max_400mb").expect("profile").target_size_mb = Some(400);
-        profiles.get_mut("video_mp4_max_400mb").expect("profile").target_audio_bitrate_kbps = 96;
+        profiles
+            .get_mut("video_mp4_max_400mb")
+            .expect("profile")
+            .target_size_mb = Some(400);
+        profiles
+            .get_mut("video_mp4_max_400mb")
+            .expect("profile")
+            .target_audio_bitrate_kbps = 96;
 
         add(
             &mut profiles,
@@ -307,10 +319,18 @@ impl Config {
                 "+faststart",
             ],
         );
-        profiles.get_mut("video_mp4_vaapi").expect("profile").hardware =
-            Some(HardwareBackend::Vaapi);
-        profiles.get_mut("video_mp4_vaapi").expect("profile").fallback_args =
-            profiles.get("video_mp4").expect("software profile").args.clone();
+        profiles
+            .get_mut("video_mp4_vaapi")
+            .expect("profile")
+            .hardware = Some(HardwareBackend::Vaapi);
+        profiles
+            .get_mut("video_mp4_vaapi")
+            .expect("profile")
+            .fallback_args = profiles
+            .get("video_mp4")
+            .expect("software profile")
+            .args
+            .clone();
 
         add(
             &mut profiles,
@@ -345,10 +365,18 @@ impl Config {
                 "+faststart",
             ],
         );
-        profiles.get_mut("video_mp4_nvenc").expect("profile").hardware =
-            Some(HardwareBackend::Nvenc);
-        profiles.get_mut("video_mp4_nvenc").expect("profile").fallback_args =
-            profiles.get("video_mp4").expect("software profile").args.clone();
+        profiles
+            .get_mut("video_mp4_nvenc")
+            .expect("profile")
+            .hardware = Some(HardwareBackend::Nvenc);
+        profiles
+            .get_mut("video_mp4_nvenc")
+            .expect("profile")
+            .fallback_args = profiles
+            .get("video_mp4")
+            .expect("software profile")
+            .args
+            .clone();
 
         add(
             &mut profiles,
@@ -382,7 +410,17 @@ impl Config {
             "ffmpeg",
             "mp3",
             "mp3",
-            vec!["-vn", "-map", "0:a:0", "-map_metadata", "0", "-c:a", "libmp3lame", "-q:a", "2"],
+            vec![
+                "-vn",
+                "-map",
+                "0:a:0",
+                "-map_metadata",
+                "0",
+                "-c:a",
+                "libmp3lame",
+                "-q:a",
+                "2",
+            ],
         );
         add(
             &mut profiles,
@@ -402,7 +440,9 @@ impl Config {
             "ffmpeg",
             "opus",
             "audio",
-            vec!["-vn", "-map", "0:a:0", "-c:a", "libopus", "-b:a", "128k", "-vbr", "on"],
+            vec![
+                "-vn", "-map", "0:a:0", "-c:a", "libopus", "-b:a", "128k", "-vbr", "on",
+            ],
         );
         add(
             &mut profiles,
@@ -516,7 +556,10 @@ impl Config {
             "неподдерживаемая версия конфигурации: {}",
             self.schema
         );
-        anyhow::ensure!(self.ffmpeg_threads > 0, "ffmpeg_threads должен быть больше нуля");
+        anyhow::ensure!(
+            self.ffmpeg_threads > 0,
+            "ffmpeg_threads должен быть больше нуля"
+        );
         anyhow::ensure!(
             self.profiles.contains_key(&self.default_profile),
             "default_profile не найден: {}",
@@ -524,14 +567,20 @@ impl Config {
         );
         for (id, profile) in &self.profiles {
             anyhow::ensure!(!id.trim().is_empty(), "пустой идентификатор профиля");
-            anyhow::ensure!(!profile.label.trim().is_empty(), "пустая метка профиля {id}");
+            anyhow::ensure!(
+                !profile.label.trim().is_empty(),
+                "пустая метка профиля {id}"
+            );
             anyhow::ensure!(
                 matches!(profile.engine.as_str(), "ffmpeg" | "magick"),
                 "неподдерживаемый engine у профиля {id}: {}",
                 profile.engine
             );
             if let Some(size) = profile.target_size_mb {
-                anyhow::ensure!(size > 0, "target_size_mb должен быть больше нуля у профиля {id}");
+                anyhow::ensure!(
+                    size > 0,
+                    "target_size_mb должен быть больше нуля у профиля {id}"
+                );
             }
         }
         for folder in &self.watch_folders {
@@ -554,7 +603,9 @@ impl Config {
 pub fn valid_watch_id(id: &str) -> bool {
     !id.is_empty()
         && id.len() <= 64
-        && id.bytes().all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
+        && id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'))
 }
 
 #[allow(clippy::too_many_arguments)]

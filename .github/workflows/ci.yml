@@ -24,7 +24,7 @@ jobs:
       - name: Install KDE and media dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install --yes dbus-x11 dolphin ffmpeg imagemagick kio-extras kservice xvfb zenity
+          sudo apt-get install --yes dbus-x11 dolphin ffmpeg imagemagick kio-extras xvfb zenity
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo build --release
       - name: Verify installed Dolphin consumer and conversion
@@ -43,7 +43,8 @@ jobs:
           dbus-run-session -- target/release/media-studio run --job-id ci-kde-proof --profile video_mp4 -- "$proof_dir/in/input.mp4"
           test -s "$proof_dir/in/input.converted-1.mp4"
           ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1 "$proof_dir/in/input.converted-1.mp4"
-          kbuildsycoca6 --noincremental
+          cache_builder="$(command -v kbuildsycoca6 || command -v kbuildsycoca5)"
+          "$cache_builder" --noincremental
           set +e
           timeout 12s xvfb-run -a dbus-run-session -- dolphin --new-window "$proof_dir/in"
           dolphin_exit=$?
