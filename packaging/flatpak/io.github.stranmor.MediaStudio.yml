@@ -28,7 +28,7 @@ modules:
     sources:
       - type: git
         url: https://github.com/Stranmor/media-studio.git
-        tag: v0.2.1
+        commit: 63dc708153b76ab7f7527579f103ce24ac106872
     build-commands:
       - cargo build --release
       - install -Dm755 target/release/media-studio /app/bin/media-studio
