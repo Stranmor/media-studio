@@ -1,8 +1,9 @@
 [package]
 name = "media-studio"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 description = "Dolphin-integrated media conversion studio"
+authors = ["Ivan Plankin"]
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/Stranmor/media-studio"
@@ -15,8 +16,20 @@ clap = { version = "*", features = ["derive"] }
 serde = { version = "*", features = ["derive"] }
 serde_json = "*"
 toml = "*"
+tempfile = "*"
+which = "*"
 
 [profile.release]
 lto = "thin"
 codegen-units = 1
 strip = true
+
+[package.metadata.deb]
+maintainer = "Ivan Plankin"
+copyright = "2026 Ivan Plankin"
+section = "utils"
+priority = "optional"
+assets = [["target/release/media-studio", "usr/bin/media-studio", "755"]]
+
+[package.metadata.generate-rpm]
+assets = [{ source = "target/release/media-studio", dest = "/usr/bin/media-studio", mode = "0755" }]

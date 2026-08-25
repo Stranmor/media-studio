@@ -4,8 +4,10 @@ use std::io::Write;
 use std::os::unix::fs::FileTypeExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
+use tempfile::{Builder, NamedTempFile};
 
 use crate::model::{Config, HardwareBackend, Profile};
+use crate::runtime;
 
 pub struct Converted {
     pub output: PathBuf,
@@ -17,7 +19,7 @@ pub fn convert(
     profile: &Profile,
     input: &Path,
     output: &Path,
-    temp: &Path,
+    overwrite: bool,
     log: &Path,
 ) -> Result<Converted> {
     if !input.is_file() {
@@ -34,28 +36,70 @@ pub fn convert(
         .append(true)
         .open(log)
         .with_context(|| format!("не удалось открыть лог {}", log.display()))?;
+    let extension = output.extension().and_then(|value| value.to_str()).unwrap_or("tmp");
+    let temp = Builder::new()
+        .prefix(".media-studio-")
+        .suffix(&format!(".part.{extension}"))
+        .tempfile_in(output.parent().unwrap_or_else(|| Path::new(".")))?;
+    let temp_path = temp.path().to_path_buf();
     writeln!(log_file, "INPUT={}", input.display())?;
-    writeln!(log_file, "OUTPUT={}", output.display())?;
+    writeln!(log_file, "OUTPUT_REQUESTED={}", output.display())?;
     writeln!(log_file, "ENGINE={}", profile.engine)?;
 
     let status = match profile.engine.as_str() {
-        "ffmpeg" => run_ffmpeg(config, profile, input, temp, &mut log_file),
-        "magick" => run_magick(profile, input, temp, &mut log_file),
+        "ffmpeg" => run_ffmpeg(config, profile, input, &temp_path, &mut log_file),
+        "magick" => run_magick(profile, input, &temp_path, &mut log_file),
         other => bail!("неподдерживаемый engine: {other}"),
     }?;
     if !status.success() {
         bail!("конвертация завершилась с кодом {status}; подробности: {}", log.display());
     }
-    if !temp.is_file() || fs::metadata(temp)?.len() == 0 {
-        bail!("движок завершился успешно, но временный результат пуст: {}", temp.display());
+    if !temp_path.is_file() || fs::metadata(&temp_path)?.len() == 0 {
+        bail!("движок завершился успешно, но временный результат пуст: {}", temp_path.display());
     }
     if config.verify_results {
-        verify(profile, temp, &mut log_file)?;
+        verify(profile, &temp_path, &mut log_file)?;
     }
-    fs::rename(temp, output)
-        .with_context(|| format!("не удалось атомарно сохранить {}", output.display()))?;
+    let actual_output = persist_output(temp, output, overwrite)?;
+    writeln!(log_file, "OUTPUT_COMMITTED={}", actual_output.display())?;
     writeln!(log_file, "RESULT=verified")?;
-    Ok(Converted { output: output.to_path_buf(), log: log.to_path_buf() })
+    Ok(Converted { output: actual_output, log: log.to_path_buf() })
+}
+
+fn persist_output(temp: NamedTempFile, requested: &Path, overwrite: bool) -> Result<PathBuf> {
+    if overwrite {
+        temp.persist(requested).map_err(|error| {
+            anyhow::anyhow!("не удалось атомарно заменить {}: {}", requested.display(), error.error)
+        })?;
+        return Ok(requested.to_path_buf());
+    }
+    let mut temp = temp;
+    for index in 0..10_000u32 {
+        let candidate = if index == 0 {
+            requested.to_path_buf()
+        } else {
+            let stem = requested.file_stem().and_then(|value| value.to_str()).unwrap_or("output");
+            let extension = requested.extension().and_then(|value| value.to_str()).unwrap_or("bin");
+            requested
+                .parent()
+                .unwrap_or_else(|| Path::new("."))
+                .join(format!("{stem}-{index}.{extension}"))
+        };
+        match temp.persist_noclobber(&candidate) {
+            Ok(_) => return Ok(candidate),
+            Err(error) if error.error.kind() == std::io::ErrorKind::AlreadyExists => {
+                temp = error.file;
+            },
+            Err(error) => {
+                return Err(anyhow::anyhow!(
+                    "не удалось атомарно сохранить {}: {}",
+                    candidate.display(),
+                    error.error
+                ));
+            },
+        }
+    }
+    bail!("не удалось зарезервировать свободное имя результата рядом с {}", requested.display())
 }
 
 fn run_ffmpeg(
@@ -107,7 +151,6 @@ fn run_ffmpeg_target(
         }
         let ratio = target_bytes as f64 / actual as f64;
         video_kbps = (video_kbps * ratio * 0.93).max(64.0);
-        let _ = fs::remove_file(temp);
     }
     let actual = fs::metadata(temp).map(|meta| meta.len()).unwrap_or(0);
     if actual > target_bytes {
@@ -137,7 +180,6 @@ fn run_ffmpeg_once(
         return Ok(status);
     }
     writeln!(log, "HARDWARE_FALLBACK=software AFTER_STATUS={status}")?;
-    let _ = fs::remove_file(temp);
     invoke_ffmpeg(config, input, temp, log, &profile.fallback_args)
 }
 
@@ -183,9 +225,11 @@ fn hardware_available(backend: &HardwareBackend) -> bool {
         HardwareBackend::Vaapi => fs::metadata("/dev/dri/renderD128")
             .map(|meta| meta.file_type().is_char_device())
             .unwrap_or(false),
-        HardwareBackend::Nvenc => Command::new("ffmpeg")
-            .args(["-hide_banner", "-encoders"])
-            .output()
+        HardwareBackend::Nvenc => runtime::required("ffmpeg")
+            .ok()
+            .and_then(|ffmpeg| {
+                Command::new(ffmpeg).args(["-hide_banner", "-encoders"]).output().ok()
+            })
             .map(|output| String::from_utf8_lossy(&output.stdout).contains("h264_nvenc"))
             .unwrap_or(false),
     }
@@ -199,7 +243,7 @@ fn invoke_ffmpeg(
     args: &[String],
 ) -> Result<std::process::ExitStatus> {
     let expanded = expanded_args(args, input, temp);
-    let mut command = Command::new("ffmpeg");
+    let mut command = Command::new(runtime::required("ffmpeg")?);
     command
         .args(["-hide_banner", "-nostdin", "-y", "-loglevel", "error", "-i"])
         .arg(input)
@@ -249,7 +293,7 @@ fn target_args(base: &[String], video_kbps: f64, audio_kbps: f64) -> Vec<String>
 }
 
 fn probe_duration(input: &Path) -> Result<f64> {
-    let output = Command::new("ffprobe")
+    let output = Command::new(runtime::required("ffprobe")?)
         .args([
             "-v",
             "error",
@@ -277,7 +321,7 @@ fn run_magick(
     log: &mut File,
 ) -> Result<std::process::ExitStatus> {
     let args = expanded_args(&profile.args, input, temp);
-    let mut command = Command::new("magick");
+    let mut command = Command::new(runtime::required("magick")?);
     if !profile.args.iter().any(|arg| arg == "{input}") {
         command.arg(input);
     }
@@ -303,7 +347,7 @@ fn expanded_args(args: &[String], input: &Path, output: &Path) -> Vec<String> {
 fn verify(profile: &Profile, output: &Path, log: &mut File) -> Result<()> {
     match profile.engine.as_str() {
         "ffmpeg" => {
-            let probe = Command::new("ffprobe")
+            let probe = Command::new(runtime::required("ffprobe")?)
                 .args([
                     "-v",
                     "error",
@@ -319,7 +363,7 @@ fn verify(profile: &Profile, output: &Path, log: &mut File) -> Result<()> {
             if !probe.status.success() || String::from_utf8_lossy(&probe.stdout).trim().is_empty() {
                 bail!("ffprobe не подтвердил результат: {}", output.display());
             }
-            let decode = Command::new("ffmpeg")
+            let decode = Command::new(runtime::required("ffmpeg")?)
                 .args(["-hide_banner", "-nostdin", "-loglevel", "error", "-xerror", "-i"])
                 .arg(output)
                 .args(["-map", "0:v?", "-map", "0:a?", "-f", "null", "-"])
@@ -331,7 +375,7 @@ fn verify(profile: &Profile, output: &Path, log: &mut File) -> Result<()> {
             }
         },
         "magick" => {
-            let check = Command::new("magick")
+            let check = Command::new(runtime::required("magick")?)
                 .args(["identify", "-quiet"])
                 .arg(output)
                 .output()
@@ -351,7 +395,7 @@ pub fn inspect(input: &Path, json: bool) -> Result<String> {
         bail!("файл не найден или это не обычный файл: {}", input.display());
     }
     if json {
-        let output = Command::new("ffprobe")
+        let output = Command::new(runtime::required("ffprobe")?)
             .args(["-v", "error", "-show_format", "-show_streams", "-of", "json"])
             .arg(input)
             .output()
@@ -360,9 +404,9 @@ pub fn inspect(input: &Path, json: bool) -> Result<String> {
             return Ok(String::from_utf8_lossy(&output.stdout).into_owned());
         }
     }
-    let output = Command::new("ffprobe").args(["-v", "error", "-show_entries", "format=filename,format_name,duration,size:stream=index,codec_type,codec_name,width,height,channels,sample_rate", "-of", "default=noprint_wrappers=1"]).arg(input).output().context("не удалось запустить ffprobe")?;
+    let output = Command::new(runtime::required("ffprobe")?).args(["-v", "error", "-show_entries", "format=filename,format_name,duration,size:stream=index,codec_type,codec_name,width,height,channels,sample_rate", "-of", "default=noprint_wrappers=1"]).arg(input).output().context("не удалось запустить ffprobe")?;
     if !output.status.success() {
-        let image = Command::new("magick")
+        let image = Command::new(runtime::required("magick")?)
             .args(["identify", "-format", "%m %wx%h %[channels]"])
             .arg(input)
             .output()?;
@@ -379,26 +423,15 @@ pub fn ensure_tools(profile: Option<&Profile>) -> Result<()> {
     if profile.map(|item| item.engine == "magick").unwrap_or(true) {
         tools.push("magick");
     }
-    if which("zenity").is_none() && which("kdialog").is_none() {
+    if runtime::optional("zenity").is_none() && runtime::optional("kdialog").is_none() {
         bail!("не найден zenity или kdialog для пользовательских окон");
     }
     for tool in tools {
-        if which(tool).is_none() {
+        if runtime::optional(tool).is_none() {
             bail!(
                 "не найден обязательный инструмент `{tool}`. Установите пакет и повторите запуск."
             );
         }
     }
     Ok(())
-}
-
-fn which(name: &str) -> Option<PathBuf> {
-    let paths = std::env::var_os("PATH")?;
-    for dir in std::env::split_paths(&paths) {
-        let candidate = dir.join(name);
-        if candidate.is_file() {
-            return Some(candidate);
-        }
-    }
-    None
 }

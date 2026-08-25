@@ -2,7 +2,11 @@
 set -euo pipefail
 
 repo="${MEDIA_STUDIO_REPO:-Stranmor/media-studio}"
-asset="media-studio-linux-x86_64"
+case "$(uname -m)" in
+  x86_64) asset="media-studio-linux-x86_64" ;;
+  aarch64|arm64) asset="media-studio-linux-aarch64" ;;
+  *) echo "Unsupported architecture: $(uname -m)" >&2; exit 2 ;;
+esac
 base_url="https://github.com/${repo}/releases/latest/download"
 tmp_dir="$(mktemp -d)"
 trap 'rm -rf "$tmp_dir"' EXIT

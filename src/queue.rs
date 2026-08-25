@@ -3,6 +3,7 @@ use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use crate::runtime;
 use crate::{paths, ui};
 
 pub fn enqueue(
@@ -19,7 +20,7 @@ pub fn enqueue(
     }
     let job_id = new_job_id();
     let unit = format!("media-studio-{job_id}.service");
-    let mut command = Command::new("systemd-run");
+    let mut command = Command::new(runtime::required("systemd-run")?);
     command
         .args([
             "--user",
@@ -71,7 +72,7 @@ pub fn enqueue(
 }
 
 pub fn list() -> Result<String> {
-    let output = Command::new("systemctl")
+    let output = Command::new(runtime::required("systemctl")?)
         .args(["--user", "list-units", "--all", "--no-legend", "media-studio-*.service"])
         .output()
         .context("не удалось прочитать очередь Media Studio")?;
@@ -87,7 +88,7 @@ pub fn cancel(job_id: &str) -> Result<()> {
     let normalized = normalized.strip_prefix("media-studio-").unwrap_or(normalized);
     anyhow::ensure!(paths::valid_job_id(normalized), "некорректный идентификатор задачи");
     let unit = format!("media-studio-{normalized}.service");
-    let output = Command::new("systemctl")
+    let output = Command::new(runtime::required("systemctl")?)
         .args(["--user", "stop", &unit])
         .output()
         .context("не удалось остановить задачу")?;

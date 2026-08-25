@@ -2,6 +2,7 @@ use anyhow::{bail, Context, Result};
 use std::process::{Command, Stdio};
 
 use crate::model::Config;
+use crate::runtime;
 
 #[derive(Debug, Clone)]
 pub struct AdvancedSelection {
@@ -12,21 +13,25 @@ pub struct AdvancedSelection {
 }
 
 pub fn notify(title: &str, body: &str) {
-    let notify_status = Command::new("notify-send")
-        .arg("--app-name=Media Studio")
-        .arg(title)
-        .arg(body)
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status();
-    if notify_status.map(|status| status.success()).unwrap_or(false) {
-        return;
+    if let Some(notify_send) = runtime::optional("notify-send") {
+        let notify_status = Command::new(notify_send)
+            .arg("--app-name=Media Studio")
+            .arg(title)
+            .arg(body)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+        if notify_status.map(|status| status.success()).unwrap_or(false) {
+            return;
+        }
     }
-    let _ = Command::new("kdialog")
-        .args(["--title", title, "--passivepopup", body, "5"])
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status();
+    if let Some(kdialog) = runtime::optional("kdialog") {
+        let _ = Command::new(kdialog)
+            .args(["--title", title, "--passivepopup", body, "5"])
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
 }
 
 pub fn error(title: &str, body: &str) {
@@ -35,7 +40,7 @@ pub fn error(title: &str, body: &str) {
 }
 
 pub fn choose_advanced(config: &Config) -> Result<AdvancedSelection> {
-    if which("zenity").is_some() {
+    if runtime::optional("zenity").is_some() {
         return choose_with_zenity(config);
     }
     choose_with_kdialog(config)
@@ -49,7 +54,7 @@ fn choose_with_zenity(config: &Config) -> Result<AdvancedSelection> {
         .collect::<Vec<_>>();
     let first = values.first().cloned().unwrap_or_else(|| config.default_profile.clone());
     let profile_values = values.join("|");
-    let output = Command::new("zenity")
+    let output = Command::new(runtime::required("zenity")?)
         .args([
             "--forms",
             "--title",
@@ -113,7 +118,7 @@ fn choose_with_kdialog(config: &Config) -> Result<AdvancedSelection> {
     for value in &owned {
         args.push(value);
     }
-    let output = Command::new("kdialog")
+    let output = Command::new(runtime::required("kdialog")?)
         .args(args)
         .output()
         .context("не удалось открыть диалог выбора профиля")?;
@@ -135,7 +140,7 @@ fn choose_with_kdialog(config: &Config) -> Result<AdvancedSelection> {
 }
 
 fn kdialog_inputbox(prompt: &str, initial: &str) -> Result<String> {
-    let output = Command::new("kdialog")
+    let output = Command::new(runtime::required("kdialog")?)
         .args(["--title", "Media Studio — расширенные настройки", "--inputbox", prompt, initial])
         .output()
         .context("не удалось открыть поле ввода KDialog")?;
@@ -146,7 +151,7 @@ fn kdialog_inputbox(prompt: &str, initial: &str) -> Result<String> {
 }
 
 fn kdialog_yesno(prompt: &str) -> Result<bool> {
-    let status = Command::new("kdialog")
+    let status = Command::new(runtime::required("kdialog")?)
         .args(["--title", "Media Studio — расширенные настройки", "--yesno", prompt])
         .status()
         .context("не удалось открыть подтверждение KDialog")?;
@@ -160,19 +165,11 @@ fn kdialog_yesno(prompt: &str) -> Result<bool> {
 }
 
 pub fn show_info(title: &str, body: &str) {
-    let _ = Command::new("zenity")
-        .args(["--info", "--title", title, "--text", body, "--width", "760"])
-        .status()
-        .or_else(|_| Command::new("kdialog").args(["--title", title, "--msgbox", body]).status());
-}
-
-fn which(name: &str) -> Option<std::path::PathBuf> {
-    let paths = std::env::var_os("PATH")?;
-    for dir in std::env::split_paths(&paths) {
-        let candidate = dir.join(name);
-        if candidate.is_file() {
-            return Some(candidate);
-        }
+    if let Some(zenity) = runtime::optional("zenity") {
+        let _ = Command::new(zenity)
+            .args(["--info", "--title", title, "--text", body, "--width", "760"])
+            .status();
+    } else if let Some(kdialog) = runtime::optional("kdialog") {
+        let _ = Command::new(kdialog).args(["--title", title, "--msgbox", body]).status();
     }
-    None
 }

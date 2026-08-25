@@ -16,3 +16,36 @@ jobs:
       - run: cargo clippy --all-targets -- -D warnings
       - run: cargo test
       - run: cargo build --release
+
+  kde-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@latest
+      - name: Install KDE and media dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes dbus-x11 dolphin ffmpeg imagemagick kio-extras xvfb zenity
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release
+      - name: Verify installed Dolphin consumer and conversion
+        shell: bash
+        run: |
+          set -euo pipefail
+          proof_dir="$(mktemp -d)"
+          mkdir -p "$proof_dir/in" "$proof_dir/out" "$proof_dir/home"
+          ffmpeg -hide_banner -loglevel error -f lavfi -i testsrc2=size=320x240:rate=10:duration=1 -c:v libx264 "$proof_dir/in/input.mp4"
+          export HOME="$proof_dir/home"
+          export XDG_CONFIG_HOME="$HOME/.config"
+          export XDG_DATA_HOME="$HOME/.local/share"
+          export XDG_STATE_HOME="$HOME/.local/state"
+          dbus-run-session -- target/release/media-studio install
+          test "$(find "$XDG_DATA_HOME/kio/servicemenus" -name 'media-studio-*.desktop' | wc -l)" -eq 3
+          dbus-run-session -- target/release/media-studio run --job-id ci-kde-proof --profile video_mp4 -- "$proof_dir/in/input.mp4"
+          test -s "$proof_dir/in/input.converted-1.mp4"
+          ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1 "$proof_dir/in/input.converted-1.mp4"
+          kbuildsycoca6 --noincremental
+          set +e
+          timeout 12s xvfb-run -a dbus-run-session -- dolphin --new-window "$proof_dir/in"
+          dolphin_exit=$?
+          set -e
+          test "$dolphin_exit" -eq 0 -o "$dolphin_exit" -eq 124

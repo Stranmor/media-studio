@@ -6,13 +6,13 @@ Media Studio — локальный конвертер медиа для KDE Dol
 
 ## Что решает проект
 
-- быстрые действия из контекстного меню Dolphin;
+- отдельные контекстные меню Dolphin для видео, аудио и изображений;
 - профили видео, аудио, изображений и remux;
 - сжатие видео до заданного размера;
 - расширенная форма с выбором профиля, размера, overwrite и fallback;
 - VAAPI и NVENC с capability-check и software fallback;
 - watch-folders с отдельным каталогом назначения;
-- временные файлы, atomic rename, `ffprobe` и полная decode-проверка;
+- безопасно зарезервированные временные файлы, atomic commit, `ffprobe` и полная decode-проверка;
 - логи и статусы jobs в `~/.local/state/media-studio/jobs/`.
 
 ## Установка
@@ -26,7 +26,7 @@ cargo build --release
 ./target/release/media-studio doctor
 ```
 
-Для x86_64 можно установить готовый бинарник без Rust toolchain:
+Для x86_64 и ARM64 можно установить готовый бинарник без Rust toolchain:
 
 ```bash
 curl --fail --location https://raw.githubusercontent.com/Stranmor/media-studio/main/install.sh | bash
@@ -37,12 +37,12 @@ curl --fail --location https://raw.githubusercontent.com/Stranmor/media-studio/m
 После установки:
 
 - binary: `~/.local/bin/media-studio`;
-- Dolphin menu: `~/.local/share/kio/servicemenus/media-studio.desktop`;
+- Dolphin menus: `media-studio-video.desktop`, `media-studio-audio.desktop`, `media-studio-image.desktop` в `~/.local/share/kio/servicemenus/`;
 - config: `~/.config/media-studio/config.toml`;
 - job state: `~/.local/state/media-studio/jobs/`.
 
 Переиндексация KDE выполняется автоматически через `kbuildsycoca6`.
-Файл Dolphin service menu намеренно использует KDE-расширения `Service`/`Actions`; generic `desktop-file-validate` может ругаться на эти ключи, хотя KDE KIO его принимает.
+Каждое меню содержит только совместимые с MIME-группой действия; generic `desktop-file-validate` может ругаться на KDE-расширения `Service`/`Actions`, хотя KDE KIO их принимает.
 
 ## Использование в Dolphin
 
@@ -52,6 +52,8 @@ curl --fail --location https://raw.githubusercontent.com/Stranmor/media-studio/m
 4. Результат появится рядом с исходным файлом, если не задан отдельный каталог назначения.
 
 Для `.ogx` и других Ogg-файлов menu учитывает MIME `application/ogg` и `audio/ogg`.
+
+Для Debian/Ubuntu, Fedora/RHEL и Arch доступны binary assets в GitHub Release; пакет устанавливает бинарник в `/usr/bin`, после чего выполните `media-studio install` для пользовательского Dolphin-меню.
 
 ## CLI
 
@@ -122,5 +124,7 @@ cargo clippy --all-targets -- -D warnings
 cargo test
 cargo build --release
 ```
+
+CI дополнительно запускает KDE smoke-test с `kbuildsycoca6`, Dolphin service menus, ImageMagick/FFmpeg fixture и реальной проверкой результата через `ffprobe`.
 
 Архитектура: [D2 map](docs/media-studio.svg). Правила contribution: [CONTRIBUTING.md](CONTRIBUTING.md). Security policy: [SECURITY.md](SECURITY.md).

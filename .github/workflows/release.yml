@@ -4,21 +4,54 @@ on:
   push:
     tags: ["v*"]
 
+permissions:
+  contents: write
+
 jobs:
-  linux-x86_64:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write
+  build:
+    strategy:
+      matrix:
+        include:
+          - arch: x86_64
+            runner: ubuntu-latest
+          - arch: aarch64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@latest
       - uses: dtolnay/rust-toolchain@stable
       - run: cargo build --release
-      - name: Prepare release assets
+      - name: Build binary and distro packages
+        shell: bash
         run: |
-          install -Dm755 target/release/media-studio media-studio-linux-x86_64
-          sha256sum media-studio-linux-x86_64 > media-studio-linux-x86_64.sha256
+          set -euo pipefail
+          cargo install cargo-deb cargo-generate-rpm
+          cargo deb --no-build
+          cargo generate-rpm
+          mkdir -p release-assets/stage
+          binary="media-studio-linux-${{ matrix.arch }}"
+          install -Dm755 target/release/media-studio "release-assets/stage/${binary}"
+          deb="$(find target/debian -type f -name '*.deb' -print -quit)"
+          rpm="$(find target/generate-rpm -type f -name '*.rpm' -print -quit)"
+          test -n "$deb" -a -n "$rpm"
+          cp "$deb" release-assets/
+          cp "$rpm" release-assets/
+          tar -czf "release-assets/${binary}.tar.gz" -C release-assets/stage "$binary"
+          (cd release-assets/stage && sha256sum "${binary}") > "release-assets/${binary}.sha256"
+          cp "release-assets/stage/${binary}" release-assets/
+      - uses: actions/upload-artifact@latest
+        with:
+          name: media-studio-${{ matrix.arch }}
+          path: release-assets/*
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@latest
+        with:
+          path: release-assets
+          merge-multiple: true
       - uses: softprops/action-gh-release@latest
         with:
-          files: |
-            media-studio-linux-x86_64
-            media-studio-linux-x86_64.sha256
+          files: release-assets/*

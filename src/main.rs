@@ -2,6 +2,7 @@ mod engine;
 mod model;
 mod paths;
 mod queue;
+mod runtime;
 mod ui;
 
 use anyhow::{bail, Context, Result};
@@ -290,18 +291,16 @@ fn run_job(
     let mut ok = 0usize;
     let mut failed = 0usize;
     let mut outputs = Vec::new();
-    for (index, raw) in raw_files.iter().enumerate() {
+    for raw in raw_files.iter() {
         let input = paths::normalize_path_arg(raw);
         let output = paths::output_path(&input, &profile, output_dir.as_deref(), overwrite);
-        let temp = paths::temp_path(&output, job_id, index);
-        let _ = fs::remove_file(&temp);
         let details = [
             ("profile", profile_id.to_string()),
             ("input", input.display().to_string()),
             ("output", output.display().to_string()),
         ];
         paths::write_job_status(job_id, "running", &details)?;
-        match engine::convert(&runtime_config, &profile, &input, &output, &temp, &log) {
+        match engine::convert(&runtime_config, &profile, &input, &output, overwrite, &log) {
             Ok(result) => {
                 ok += 1;
                 outputs.push(result.output.clone());
@@ -320,7 +319,6 @@ fn run_job(
                     format_error(&error),
                     log.display()
                 );
-                let _ = fs::remove_file(&temp);
             },
         }
     }
@@ -476,9 +474,10 @@ fn run_watch_command(command: WatchCommand) -> Result<()> {
             config.watch_folders.retain(|folder| folder.id != id);
             config.write(&paths::config_path())?;
             let unit = format!("media-studio-watch-{id}.service");
-            let _ = Command::new("systemctl").args(["--user", "disable", "--now", &unit]).status();
+            let _ =
+                required_command("systemctl")?.args(["--user", "disable", "--now", &unit]).status();
             let _ = fs::remove_file(paths::watch_service_path(&id));
-            let _ = Command::new("systemctl").args(["--user", "daemon-reload"]).status();
+            let _ = required_command("systemctl")?.args(["--user", "daemon-reload"]).status();
             println!("WATCH_REMOVED id={id}");
             Ok(())
         },
@@ -501,8 +500,9 @@ fn run_watch_command(command: WatchCommand) -> Result<()> {
             ensure_watch_id(&id)?;
             let mut config = load_config()?;
             let unit = format!("media-studio-watch-{id}.service");
-            let status =
-                Command::new("systemctl").args(["--user", "disable", "--now", &unit]).status()?;
+            let status = required_command("systemctl")?
+                .args(["--user", "disable", "--now", &unit])
+                .status()?;
             if !status.success() {
                 bail!("не удалось остановить {unit}");
             }
@@ -532,15 +532,16 @@ fn install_watch_unit(folder: &WatchFolder) -> Result<()> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)?;
     }
-    let unit = format!("[Unit]\nDescription=Media Studio watch-folder {}\nAfter=graphical-session.target\n\n[Service]\nExecStart={} watch-run --id {}\nRestart=always\nRestartSec=4\n\n[Install]\nWantedBy=default.target\n", folder.id, binary.display(), folder.id);
+    let binary = systemd_quote(&binary);
+    let unit = format!("[Unit]\nDescription=Media Studio watch-folder {}\nAfter=graphical-session.target\n\n[Service]\nExecStart={} watch-run --id {}\nRestart=always\nRestartSec=4\n\n[Install]\nWantedBy=default.target\n", folder.id, binary, folder.id);
     paths::atomic_write(&path, unit.as_bytes())?;
-    let reload = Command::new("systemctl").args(["--user", "daemon-reload"]).status()?;
+    let reload = required_command("systemctl")?.args(["--user", "daemon-reload"]).status()?;
     if !reload.success() {
         bail!("systemd user не принял daemon-reload");
     }
     let unit_name = format!("media-studio-watch-{}.service", folder.id);
     let enabled =
-        Command::new("systemctl").args(["--user", "enable", "--now", &unit_name]).status()?;
+        required_command("systemctl")?.args(["--user", "enable", "--now", &unit_name]).status()?;
     if !enabled.success() {
         bail!("не удалось включить {unit_name}");
     }
@@ -698,7 +699,14 @@ fn doctor() -> Result<()> {
         }
     }
     println!("binary: {}", paths::installed_binary_path().display());
-    println!("service_menu: {}", paths::service_menu_path().display());
+    println!(
+        "service_menus: {}",
+        paths::service_menu_paths()
+            .iter()
+            .map(|path| path.display().to_string())
+            .collect::<Vec<_>>()
+            .join(", ")
+    );
     if !missing_core.is_empty() {
         bail!("не хватает обязательных инструментов: {}", missing_core.join(", "));
     }
@@ -728,22 +736,29 @@ fn install(force_config: bool) -> Result<()> {
         config.write(&config_path)?;
         config
     };
-    let menu_path = paths::service_menu_path();
-    if let Some(parent) = menu_path.parent() {
-        fs::create_dir_all(parent)?;
+    let menu_paths = paths::service_menu_paths();
+    fs::create_dir_all(paths::service_menu_dir())?;
+    for (menu_path, menu) in menu_paths.iter().zip(service_menus(&target)) {
+        fs::write(menu_path, menu)?;
+        fs::set_permissions(menu_path, fs::Permissions::from_mode(0o755))?;
     }
-    fs::write(&menu_path, service_menu(&target))?;
-    fs::set_permissions(&menu_path, fs::Permissions::from_mode(0o755))?;
+    let legacy_menu = paths::legacy_service_menu_path();
+    if legacy_menu.is_file() {
+        fs::remove_file(&legacy_menu)?;
+    }
     hide_legacy_menus()?;
     for folder in &config.watch_folders {
         if folder.enabled {
             install_watch_unit(folder)?;
         }
     }
-    let cache = Command::new("kbuildsycoca6").arg("--noincremental").status();
+    let cache = required_command("kbuildsycoca6")?.arg("--noincremental").status();
     println!("installed_binary={}", target.display());
     println!("config={}", config_path.display());
-    println!("service_menu={}", menu_path.display());
+    println!(
+        "service_menus={}",
+        menu_paths.iter().map(|path| path.display().to_string()).collect::<Vec<_>>().join(",")
+    );
     println!(
         "kde_cache={}",
         match cache {
@@ -757,39 +772,61 @@ fn install(force_config: bool) -> Result<()> {
 
 fn uninstall(purge: bool) -> Result<()> {
     let mut warnings = Vec::new();
-    if let Ok(status) = Command::new("systemctl").args(["--user", "daemon-reload"]).status() {
-        if !status.success() {
-            warnings.push(format!("первичный daemon-reload завершился с кодом {status}"));
+    if let Some(systemctl) = runtime::optional("systemctl") {
+        if let Ok(status) = Command::new(&systemctl).args(["--user", "daemon-reload"]).status() {
+            if !status.success() {
+                warnings.push(format!("первичный daemon-reload завершился с кодом {status}"));
+            }
         }
+    } else {
+        warnings.push("systemctl не найден; user units не остановлены".to_string());
     }
     if let Ok(entries) = fs::read_dir(paths::systemd_user_dir()) {
         for entry in entries.flatten() {
             let path = entry.path();
             let Some(name) = path.file_name().and_then(|name| name.to_str()) else { continue };
             if name.starts_with("media-studio-watch-") && name.ends_with(".service") {
-                match Command::new("systemctl").args(["--user", "disable", "--now", name]).status()
-                {
-                    Ok(status) if status.success() => {},
-                    Ok(status) => {
-                        warnings.push(format!("не удалось остановить {name}: код {status}"))
-                    },
-                    Err(error) => warnings.push(format!("не удалось остановить {name}: {error}")),
+                if let Some(systemctl) = runtime::optional("systemctl") {
+                    match Command::new(systemctl)
+                        .args(["--user", "disable", "--now", name])
+                        .status()
+                    {
+                        Ok(status) if status.success() => {},
+                        Ok(status) => {
+                            warnings.push(format!("не удалось остановить {name}: код {status}"))
+                        },
+                        Err(error) => {
+                            warnings.push(format!("не удалось остановить {name}: {error}"))
+                        },
+                    }
+                } else {
+                    warnings.push(format!("systemctl не найден; unit {name} не остановлен"));
                 }
                 let _ = fs::remove_file(path);
             }
         }
     }
-    match Command::new("systemctl").args(["--user", "daemon-reload"]).status() {
-        Ok(status) if status.success() => {},
-        Ok(status) => warnings.push(format!("финальный daemon-reload завершился с кодом {status}")),
-        Err(error) => {
-            warnings.push(format!("не удалось выполнить финальный daemon-reload: {error}"))
-        },
+    if let Some(systemctl) = runtime::optional("systemctl") {
+        match Command::new(systemctl).args(["--user", "daemon-reload"]).status() {
+            Ok(status) if status.success() => {},
+            Ok(status) => {
+                warnings.push(format!("финальный daemon-reload завершился с кодом {status}"))
+            },
+            Err(error) => {
+                warnings.push(format!("не удалось выполнить финальный daemon-reload: {error}"))
+            },
+        }
+    } else {
+        warnings.push("systemctl не найден; финальный daemon-reload пропущен".to_string());
     }
-    let menu = paths::service_menu_path();
     let binary = paths::installed_binary_path();
-    if menu.is_file() {
-        fs::remove_file(&menu)?;
+    for menu in paths::service_menu_paths()
+        .into_iter()
+        .chain(std::iter::once(paths::legacy_service_menu_path()))
+    {
+        if menu.is_file() {
+            fs::remove_file(menu)?;
+        }
     }
     if binary.is_file() {
         fs::remove_file(&binary)?;
@@ -808,14 +845,16 @@ fn uninstall(purge: bool) -> Result<()> {
             fs::remove_dir_all(state_dir)?;
         }
     }
-    let cache = Command::new("kbuildsycoca6").arg("--noincremental").status();
+    let cache = runtime::optional("kbuildsycoca6")
+        .map(|kbuildsycoca6| Command::new(kbuildsycoca6).arg("--noincremental").status());
     println!("uninstalled_binary={}", binary.display());
-    println!("uninstalled_service_menu={}", menu.display());
+    println!("uninstalled_service_menus={}", paths::service_menu_dir().display());
     println!("purged={purge}");
     match cache {
-        Ok(status) if status.success() => {},
-        Ok(status) => warnings.push(format!("kbuildsycoca6 завершился с кодом {status}")),
-        Err(error) => warnings.push(format!("не удалось обновить KDE cache: {error}")),
+        Some(Ok(status)) if status.success() => {},
+        Some(Ok(status)) => warnings.push(format!("kbuildsycoca6 завершился с кодом {status}")),
+        None => warnings.push("kbuildsycoca6 не найден; KDE cache не обновлён".to_string()),
+        Some(Err(error)) => warnings.push(format!("не удалось обновить KDE cache: {error}")),
     }
     if warnings.is_empty() {
         Ok(())
@@ -833,10 +872,7 @@ fn hide_legacy_menus() -> Result<()> {
         "video-tools.desktop",
         "convert-audio-to-opus.desktop",
     ];
-    let source_dir = paths::service_menu_path()
-        .parent()
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| PathBuf::from("."));
+    let source_dir = paths::service_menu_dir();
     let disabled_dir = source_dir.join("disabled");
     fs::create_dir_all(&disabled_dir)?;
     for name in legacy {
@@ -852,10 +888,7 @@ fn hide_legacy_menus() -> Result<()> {
 }
 
 fn restore_legacy_menus() -> Result<()> {
-    let source_dir = paths::service_menu_path()
-        .parent()
-        .map(Path::to_path_buf)
-        .unwrap_or_else(|| PathBuf::from("."));
+    let source_dir = paths::service_menu_dir();
     let disabled_dir = source_dir.join("disabled");
     if !disabled_dir.is_dir() {
         return Ok(());
@@ -872,130 +905,231 @@ fn restore_legacy_menus() -> Result<()> {
     Ok(())
 }
 
-fn service_menu(executable: &Path) -> String {
+#[derive(Clone, Copy)]
+struct MenuAction {
+    id: &'static str,
+    name: &'static str,
+    name_ru: &'static str,
+    icon: &'static str,
+    command: &'static str,
+}
+
+const VIDEO_ACTIONS: &[MenuAction] = &[
+    MenuAction {
+        id: "mp4",
+        name: "Video → MP4 (H.264)",
+        name_ru: "Видео → MP4 (H.264)",
+        icon: "video-x-generic",
+        command: "enqueue --profile video_mp4",
+    },
+    MenuAction {
+        id: "mp4hq",
+        name: "Video → MP4 (H.264 HQ)",
+        name_ru: "Видео → MP4 (H.264 HQ)",
+        icon: "video-x-generic",
+        command: "enqueue --profile video_mp4_hq",
+    },
+    MenuAction {
+        id: "h265",
+        name: "Video → MP4 (H.265)",
+        name_ru: "Видео → MP4 (H.265)",
+        icon: "video-x-generic",
+        command: "enqueue --profile video_mp4_h265",
+    },
+    MenuAction {
+        id: "webm",
+        name: "Video → WebM (AV1/Opus)",
+        name_ru: "Видео → WebM (AV1/Opus)",
+        icon: "video-x-generic",
+        command: "enqueue --profile video_webm_av1",
+    },
+    MenuAction {
+        id: "size400",
+        name: "Video → MP4 (до 400 МБ)",
+        name_ru: "Видео → MP4 (до 400 МБ)",
+        icon: "video-x-generic",
+        command: "enqueue --profile video_mp4_400mb",
+    },
+    MenuAction {
+        id: "max400",
+        name: "Video → MP4 (сильное сжатие, до 400 МБ)",
+        name_ru: "Видео → MP4 (сильное сжатие, до 400 МБ)",
+        icon: "video-x-generic",
+        command: "enqueue --profile video_mp4_max_400mb",
+    },
+    MenuAction {
+        id: "vaapi",
+        name: "Video → MP4 (VAAPI)",
+        name_ru: "Видео → MP4 (VAAPI)",
+        icon: "video-x-generic",
+        command: "enqueue --profile video_mp4_vaapi",
+    },
+    MenuAction {
+        id: "nvenc",
+        name: "Video → MP4 (NVENC)",
+        name_ru: "Видео → MP4 (NVENC)",
+        icon: "video-x-generic",
+        command: "enqueue --profile video_mp4_nvenc",
+    },
+    MenuAction {
+        id: "opus",
+        name: "Extract audio → Opus",
+        name_ru: "Извлечь аудио → Opus",
+        icon: "audio-x-generic",
+        command: "enqueue --profile extract_audio_opus",
+    },
+    MenuAction {
+        id: "remux",
+        name: "Container → MKV (no re-encode)",
+        name_ru: "Контейнер → MKV (без перекодирования)",
+        icon: "package-x-generic",
+        command: "enqueue --profile remux_mkv",
+    },
+    MenuAction {
+        id: "strip",
+        name: "Video without audio",
+        name_ru: "Видео без аудио",
+        icon: "audio-volume-muted",
+        command: "enqueue --profile strip_audio",
+    },
+    MenuAction {
+        id: "advanced",
+        name: "Advanced profile…",
+        name_ru: "Расширенный профиль…",
+        icon: "configure",
+        command: "choose",
+    },
+    MenuAction {
+        id: "inspect",
+        name: "Inspect media",
+        name_ru: "Информация о медиафайле",
+        icon: "dialog-information",
+        command: "inspect",
+    },
+];
+
+const AUDIO_ACTIONS: &[MenuAction] = &[
+    MenuAction {
+        id: "mp3",
+        name: "Audio → MP3",
+        name_ru: "Аудио → MP3",
+        icon: "audio-x-generic",
+        command: "enqueue --profile audio_mp3",
+    },
+    MenuAction {
+        id: "flac",
+        name: "Audio → FLAC",
+        name_ru: "Аудио → FLAC",
+        icon: "audio-x-generic",
+        command: "enqueue --profile audio_flac",
+    },
+    MenuAction {
+        id: "opus",
+        name: "Audio → Opus",
+        name_ru: "Аудио → Opus",
+        icon: "audio-x-generic",
+        command: "enqueue --profile audio_opus",
+    },
+    MenuAction {
+        id: "advanced",
+        name: "Advanced profile…",
+        name_ru: "Расширенный профиль…",
+        icon: "configure",
+        command: "choose",
+    },
+    MenuAction {
+        id: "inspect",
+        name: "Inspect media",
+        name_ru: "Информация о медиафайле",
+        icon: "dialog-information",
+        command: "inspect",
+    },
+];
+
+const IMAGE_ACTIONS: &[MenuAction] = &[
+    MenuAction {
+        id: "webp",
+        name: "Image → WebP",
+        name_ru: "Изображение → WebP",
+        icon: "image-x-generic",
+        command: "enqueue --profile image_webp",
+    },
+    MenuAction {
+        id: "jpeg",
+        name: "Image → JPEG",
+        name_ru: "Изображение → JPEG",
+        icon: "image-x-generic",
+        command: "enqueue --profile image_jpeg",
+    },
+    MenuAction {
+        id: "avif",
+        name: "Image → AVIF",
+        name_ru: "Изображение → AVIF",
+        icon: "image-x-generic",
+        command: "enqueue --profile image_avif",
+    },
+    MenuAction {
+        id: "resize",
+        name: "Image → maximum 1920×1080",
+        name_ru: "Изображение → максимум 1920×1080",
+        icon: "image-x-generic",
+        command: "enqueue --profile image_resize_1080",
+    },
+    MenuAction {
+        id: "advanced",
+        name: "Advanced profile…",
+        name_ru: "Расширенный профиль…",
+        icon: "configure",
+        command: "choose",
+    },
+    MenuAction {
+        id: "inspect",
+        name: "Inspect media",
+        name_ru: "Информация о медиафайле",
+        icon: "dialog-information",
+        command: "inspect",
+    },
+];
+
+fn service_menus(executable: &Path) -> Vec<String> {
+    vec![
+        service_menu(
+            executable,
+            "Media Studio — Video",
+            "Видео",
+            "video/*;video/ogg;",
+            VIDEO_ACTIONS,
+        ),
+        service_menu(
+            executable,
+            "Media Studio — Audio",
+            "Аудио",
+            "audio/*;application/ogg;application/x-ogg;audio/ogg;audio/opus;audio/x-opus+ogg;",
+            AUDIO_ACTIONS,
+        ),
+        service_menu(executable, "Media Studio — Images", "Изображения", "image/*;", IMAGE_ACTIONS),
+    ]
+}
+
+fn service_menu(
+    executable: &Path,
+    name: &str,
+    name_ru: &str,
+    mime_types: &str,
+    actions: &[MenuAction],
+) -> String {
     let exe = desktop_quote(executable);
-    format!(
-        r#"[Desktop Entry]
-Type=Service
-ServiceTypes=KonqPopupMenu/Plugin
-X-KDE-ServiceTypes=KonqPopupMenu/Plugin
-Name=Media Studio
-Name[ru]=Media Studio
-MimeType=video/*;audio/*;image/*;application/ogg;application/x-ogg;audio/ogg;audio/x-ogg;audio/opus;audio/x-opus+ogg;video/ogg;
-Actions=mp4;mp4hq;h265;webm;size400;max400;vaapi;nvenc;opus;mp3;flac;remux;strip;webp;jpeg;avif;advanced;inspect;
-X-KDE-Submenu=Media Studio
-X-KDE-Submenu[ru]=Media Studio
-Icon=applications-multimedia
-
-[Desktop Action mp4]
-Name=Video → MP4 (H.264)
-Name[ru]=Видео → MP4 (H.264)
-Icon=video-x-generic
-Exec={exe} enqueue --profile video_mp4 %F
-
-[Desktop Action mp4hq]
-Name=Video → MP4 (H.264 HQ)
-Name[ru]=Видео → MP4 (H.264 HQ)
-Icon=video-x-generic
-Exec={exe} enqueue --profile video_mp4_hq %F
-
-[Desktop Action h265]
-Name=Video → MP4 (H.265)
-Name[ru]=Видео → MP4 (H.265)
-Icon=video-x-generic
-Exec={exe} enqueue --profile video_mp4_h265 %F
-
-[Desktop Action webm]
-Name=Video → WebM (AV1/Opus)
-Name[ru]=Видео → WebM (AV1/Opus)
-Icon=video-x-generic
-Exec={exe} enqueue --profile video_webm_av1 %F
-
-[Desktop Action size400]
-Name=Video → MP4 (до 400 МБ)
-Name[ru]=Видео → MP4 (до 400 МБ)
-Icon=video-x-generic
-Exec={exe} enqueue --profile video_mp4_400mb %F
-
-[Desktop Action max400]
-Name=Video → MP4 (сильное сжатие, до 400 МБ)
-Name[ru]=Видео → MP4 (сильное сжатие, до 400 МБ)
-Icon=video-x-generic
-Exec={exe} enqueue --profile video_mp4_max_400mb %F
-
-[Desktop Action vaapi]
-Name=Video → MP4 (VAAPI)
-Name[ru]=Видео → MP4 (VAAPI)
-Icon=video-x-generic
-Exec={exe} enqueue --profile video_mp4_vaapi %F
-
-[Desktop Action nvenc]
-Name=Video → MP4 (NVENC)
-Name[ru]=Видео → MP4 (NVENC)
-Icon=video-x-generic
-Exec={exe} enqueue --profile video_mp4_nvenc %F
-
-[Desktop Action opus]
-Name=Extract audio → Opus
-Name[ru]=Извлечь аудио → Opus
-Icon=audio-x-generic
-Exec={exe} enqueue --profile extract_audio_opus %F
-
-[Desktop Action mp3]
-Name=Audio → MP3
-Name[ru]=Аудио → MP3
-Icon=audio-x-generic
-Exec={exe} enqueue --profile audio_mp3 %F
-
-[Desktop Action flac]
-Name=Audio → FLAC
-Name[ru]=Аудио → FLAC
-Icon=audio-x-generic
-Exec={exe} enqueue --profile audio_flac %F
-
-[Desktop Action remux]
-Name=Container → MKV (no re-encode)
-Name[ru]=Контейнер → MKV (без перекодирования)
-Icon=package-x-generic
-Exec={exe} enqueue --profile remux_mkv %F
-
-[Desktop Action strip]
-Name=Video without audio
-Name[ru]=Видео без аудио
-Icon=audio-volume-muted
-Exec={exe} enqueue --profile strip_audio %F
-
-[Desktop Action webp]
-Name=Image → WebP
-Name[ru]=Изображение → WebP
-Icon=image-x-generic
-Exec={exe} enqueue --profile image_webp %F
-
-[Desktop Action jpeg]
-Name=Image → JPEG
-Name[ru]=Изображение → JPEG
-Icon=image-x-generic
-Exec={exe} enqueue --profile image_jpeg %F
-
-[Desktop Action avif]
-Name=Image → AVIF
-Name[ru]=Изображение → AVIF
-Icon=image-x-generic
-Exec={exe} enqueue --profile image_avif %F
-
-[Desktop Action advanced]
-Name=Advanced profile…
-Name[ru]=Расширенный профиль…
-Icon=configure
-Exec={exe} choose %F
-
-[Desktop Action inspect]
-Name=Inspect media
-Name[ru]=Информация о медиафайле
-Icon=dialog-information
-Exec={exe} inspect %F
-"#
-    )
+    let action_ids = actions.iter().map(|action| action.id).collect::<Vec<_>>().join(";");
+    let mut output = format!(
+        "[Desktop Entry]\nType=Service\nServiceTypes=KonqPopupMenu/Plugin\nX-KDE-ServiceTypes=KonqPopupMenu/Plugin\nName={name}\nName[ru]={name_ru}\nMimeType={mime_types}\nActions={action_ids};\nX-KDE-Submenu=Media Studio\nX-KDE-Submenu[ru]=Media Studio\nIcon=applications-multimedia\n"
+    );
+    for action in actions {
+        output.push_str(&format!(
+            "\n[Desktop Action {}]\nName={}\nName[ru]={}\nIcon={}\nExec={} {} %F\n",
+            action.id, action.name, action.name_ru, action.icon, exe, action.command
+        ));
+    }
+    output
 }
 
 fn desktop_quote(path: &Path) -> String {
@@ -1003,15 +1137,17 @@ fn desktop_quote(path: &Path) -> String {
     format!("\"{raw}\"")
 }
 
+fn systemd_quote(path: &Path) -> String {
+    let raw = path.to_string_lossy().replace('\\', "\\\\").replace('"', "\\\"");
+    format!("\"{raw}\"")
+}
+
 fn find_on_path(name: &str) -> Option<PathBuf> {
-    let path = std::env::var_os("PATH")?;
-    for dir in std::env::split_paths(&path) {
-        let candidate = dir.join(name);
-        if candidate.is_file() {
-            return Some(candidate);
-        }
-    }
-    None
+    runtime::optional(name)
+}
+
+fn required_command(name: &str) -> Result<Command> {
+    Ok(Command::new(runtime::required(name)?))
 }
 
 fn format_error(error: &anyhow::Error) -> String {
@@ -1035,10 +1171,19 @@ mod tests {
 
     #[test]
     fn menu_quotes_executable() {
-        let menu = service_menu(Path::new("/tmp/media studio"));
-        assert!(menu.contains("Exec=\"/tmp/media studio\" enqueue"));
-        assert!(menu.contains("X-KDE-ServiceTypes=KonqPopupMenu/Plugin"));
-        assert!(menu.contains("application/ogg"));
+        let menus = service_menus(Path::new("/tmp/media studio"));
+        assert_eq!(menus.len(), 3);
+        assert!(menus[0].contains("Exec=\"/tmp/media studio\" enqueue"));
+        assert!(menus[0].contains("MimeType=video/*;"));
+        assert!(menus[1].contains("MimeType=audio/*;"));
+        assert!(menus[2].contains("MimeType=image/*;"));
+        assert!(!menus[2].contains("video_mp4"));
+        assert!(!menus[1].contains("image_webp"));
+    }
+
+    #[test]
+    fn watch_unit_quotes_binary_path() {
+        assert_eq!(systemd_quote(Path::new("/tmp/media studio/bin")), "\"/tmp/media studio/bin\"");
     }
 
     #[test]

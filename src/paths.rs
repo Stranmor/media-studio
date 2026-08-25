@@ -30,11 +30,22 @@ pub fn installed_binary_path() -> PathBuf {
     home_dir().join(".local/bin/media-studio")
 }
 
-pub fn service_menu_path() -> PathBuf {
+pub fn service_menu_dir() -> PathBuf {
     env::var_os("XDG_DATA_HOME")
         .map(PathBuf::from)
         .unwrap_or_else(|| home_dir().join(".local/share"))
-        .join("kio/servicemenus/media-studio.desktop")
+        .join("kio/servicemenus")
+}
+
+pub fn service_menu_paths() -> Vec<PathBuf> {
+    ["media-studio-video.desktop", "media-studio-audio.desktop", "media-studio-image.desktop"]
+        .into_iter()
+        .map(|name| service_menu_dir().join(name))
+        .collect()
+}
+
+pub fn legacy_service_menu_path() -> PathBuf {
+    service_menu_dir().join("media-studio.desktop")
 }
 
 pub fn systemd_user_dir() -> PathBuf {
@@ -128,12 +139,6 @@ pub fn output_path(
     parent.join(format!("{stem}.{suffix}-overflow.{extension}"))
 }
 
-pub fn temp_path(output: &Path, job_id: &str, index: usize) -> PathBuf {
-    let file_name = output.file_name().and_then(OsStr::to_str).unwrap_or("output");
-    let extension = output.extension().and_then(OsStr::to_str).unwrap_or("tmp");
-    output.with_file_name(format!(".{file_name}.{job_id}.{index}.part.{extension}"))
-}
-
 pub fn job_log_path(job_id: &str) -> PathBuf {
     state_dir().join("jobs").join(format!("{job_id}.log"))
 }
@@ -179,12 +184,6 @@ mod tests {
             normalize_path_arg("file:///tmp/with%20space.mkv"),
             PathBuf::from("/tmp/with space.mkv")
         );
-    }
-
-    #[test]
-    fn temporary_output_keeps_container_extension() {
-        let output = PathBuf::from("/tmp/example.mp4");
-        assert!(temp_path(&output, "job", 0).to_string_lossy().ends_with(".part.mp4"));
     }
 
     #[test]
