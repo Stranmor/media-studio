@@ -1,0 +1,103 @@
+{
+  "schema_version": 1,
+  "claim": "Media Studio main has a bounded current-checkout Flatpak-builder/runtime smoke job and a protected manual VAAPI/NVENC self-hosted hardware matrix. This claim is limited to source-level workflow correctness and does not claim production Flatpak sandbox readiness, host integration readiness, reproducible builds, or universal GPU availability.",
+  "submitted_at_unix_ms": 1787642033135,
+  "reviewed_at_unix_ms": 1787642584528,
+  "endpoint": "https://antigravity.quantumind.ru/v1/responses",
+  "http_status": 200,
+  "request_sha256": "1968c120de965f97a3e11122424c343b8a072122df7e71261cdd18e0c5e2c83b",
+  "initial_request_sha256": "1968c120de965f97a3e11122424c343b8a072122df7e71261cdd18e0c5e2c83b",
+  "transport": "json",
+  "prompt_sha256": "908c759b4191b17fde2b2e229ac7f9de5dbcd788f7d0caa2f58c0829f0e6b44e",
+  "review_input_sha256": "203ce3a91fc0fb02cebaa851a9d856613108bbd0d86be6f4db2016ecbd60b0b8",
+  "response_sha256": "5bfc047de3211ba5530cbed8b88d4cb4d4a5f9bcecb9dc776a49daba4a371f78",
+  "response_stream_sha256": "3ad61ef9e9b48f562d9e14684b277c3a9511a19ec050cd6b70c828d6e66ffa73",
+  "model_preference": [
+    "gpt-5.6-luna"
+  ],
+  "model_requested": "gpt-5.6-luna",
+  "model_returned": "gpt-5.6-luna",
+  "reasoning_effort_requested": "max",
+  "response_id": "resp_08b6ccf2e6359cbe016a8d40b4c5bc87d085731d5af21eba31",
+  "response_status": "completed",
+  "sources": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "23d360d8656cbc939e16f436e4b978b3e12c003a694aa2499561a6a7baaa9967",
+      "bytes": 5871,
+      "line_count": 117,
+      "selection": null
+    },
+    {
+      "path": ".github/workflows/gpu.yml",
+      "sha256": "8bcffdce487804467d925a8be54d1a2b6a1203a872b9b43cca75bc36fbcabdd1",
+      "bytes": 978,
+      "line_count": 36,
+      "selection": null
+    },
+    {
+      "path": "packaging/gpu/hardware-smoke.sh",
+      "sha256": "c89e605c0efdbfe2fd080f5386ad4a4cd072c82d3d6ec22c5515bbcab552f74f",
+      "bytes": 2149,
+      "line_count": 68,
+      "selection": null
+    },
+    {
+      "path": "docs/ci/gpu-runners.md",
+      "sha256": "7aa0665668e302b71b187487e872e3b1afb7a850195ff07d48466cff8c2ceeeb",
+      "bytes": 1311,
+      "line_count": 20,
+      "selection": null
+    },
+    {
+      "path": "packaging/flatpak/io.github.stranmor.MediaStudio.yml",
+      "sha256": "9081222011abe6ef4d75aade30fe5ab08ad158850fb7a76f4d57c3313209b450",
+      "bytes": 1410,
+      "line_count": 37,
+      "selection": null
+    },
+    {
+      "path": "packaging/flatpak/io.github.stranmor.MediaStudio.ci.yml",
+      "sha256": "8706701b983c0e7d9e1c10a99a3fa072ab40c0c649fbe089057e2f1337914862",
+      "bytes": 1315,
+      "line_count": 36,
+      "selection": null
+    },
+    {
+      "path": "src/engine.rs",
+      "sha256": "cc2675eac8c46fe39f92ac677afbd0e27afbc9c8388ad10c93d710cd3f653505",
+      "bytes": 23432,
+      "line_count": 677,
+      "selection": null
+    }
+  ],
+  "images": [],
+  "ready": true,
+  "output": {
+    "verdict": "READY",
+    "claim_status": "Supported at the stated source-level scope; external execution remains unverified.",
+    "summary": "The supplied workflows and scripts provide the required bounded Flatpak build/install/runtime path and protected VAAPI/NVENC matrix with fail-closed hardware checks. No material defect is evident in the bound files.",
+    "material_defects": [],
+    "evidence_gaps": [
+      "No completed GitHub CI logs or trusted runner results were supplied.",
+      "Self-hosted device access, runner labels, and environment protection require external provisioning verification.",
+      "CLI/profile definitions and log-path behavior are not included in the bound sources."
+    ],
+    "supported_claims": [
+      "ci.yml invokes flatpak-builder, installs media-studio.flatpak, and runs the packaged command inside Flatpak under a bounded push-only job.",
+      "gpu.yml restricts execution to manual dispatches on upstream main and uses explicit self-hosted backend labels.",
+      "hardware-smoke.sh checks exact encoders, disables fallback, validates and decodes output, and rejects fallback markers.",
+      "The packaging job enforces release/CI manifest parity and the xdg-data/kio permission contract."
+    ],
+    "prohibited_claims": [
+      "Production Flatpak sandbox or host-integration readiness.",
+      "Reproducible builds.",
+      "Universal VAAPI/NVENC availability."
+    ],
+    "required_changes": [],
+    "residual_risks": [
+      "The push-only privileged builder and mutable action/runtime references remain supply-chain and reproducibility risks outside the claim.",
+      "GPU coverage remains unverified when no trusted runner is available."
+    ]
+  }
+}

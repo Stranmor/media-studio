@@ -1,0 +1,155 @@
+{
+  "schema_version": 1,
+  "claim": "Media Studio main now has a bounded current-checkout Flatpak-builder/runtime smoke job and a protected manual VAAPI/NVENC self-hosted hardware matrix; the review does not claim production Flatpak sandbox readiness or universal GPU availability.",
+  "submitted_at_unix_ms": 1787640372929,
+  "reviewed_at_unix_ms": 1787640875235,
+  "endpoint": "https://antigravity.quantumind.ru/v1/responses",
+  "http_status": 200,
+  "request_sha256": "20447f858f1688982b272b741a2ed5a747a78191992fba07e55a03127184d5c4",
+  "initial_request_sha256": "20447f858f1688982b272b741a2ed5a747a78191992fba07e55a03127184d5c4",
+  "transport": "json",
+  "prompt_sha256": "3fcb055024140b3092ea7be952b030d7cf554c44cf2a8fe083236d7773b80551",
+  "review_input_sha256": "251864ea197cc94db1e50bf82c0cd5f2af5fda38a34be9bf4691df159f59698d",
+  "response_sha256": "96b0dc19872f598aa62c5ce4378b765d720da233e7dc19a8e429741e43ef6287",
+  "response_stream_sha256": "651dade4c19adf82b41925a4f256280cbbce40ae7d70d43e8a06188e3955014d",
+  "model_preference": [
+    "gpt-5.6-luna"
+  ],
+  "model_requested": "gpt-5.6-luna",
+  "model_returned": "gpt-5.6-luna",
+  "reasoning_effort_requested": "max",
+  "response_id": "resp_04f864f9d7efea79016a8d3a373c1887d0aceb8b09ffdf9a4d",
+  "response_status": "completed",
+  "sources": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "4a3408a7e2d67d03dd375d6547c26f02b4f67827961c6a867f26f928699e339a",
+      "bytes": 5766,
+      "line_count": 116,
+      "selection": null
+    },
+    {
+      "path": ".github/workflows/gpu.yml",
+      "sha256": "8bcffdce487804467d925a8be54d1a2b6a1203a872b9b43cca75bc36fbcabdd1",
+      "bytes": 978,
+      "line_count": 36,
+      "selection": null
+    },
+    {
+      "path": "packaging/gpu/hardware-smoke.sh",
+      "sha256": "c89e605c0efdbfe2fd080f5386ad4a4cd072c82d3d6ec22c5515bbcab552f74f",
+      "bytes": 2149,
+      "line_count": 68,
+      "selection": null
+    },
+    {
+      "path": "docs/ci/gpu-runners.md",
+      "sha256": "7aa0665668e302b71b187487e872e3b1afb7a850195ff07d48466cff8c2ceeeb",
+      "bytes": 1311,
+      "line_count": 20,
+      "selection": null
+    },
+    {
+      "path": "packaging/flatpak/io.github.stranmor.MediaStudio.yml",
+      "sha256": "9081222011abe6ef4d75aade30fe5ab08ad158850fb7a76f4d57c3313209b450",
+      "bytes": 1410,
+      "line_count": 37,
+      "selection": null
+    },
+    {
+      "path": "packaging/flatpak/io.github.stranmor.MediaStudio.ci.yml",
+      "sha256": "8706701b983c0e7d9e1c10a99a3fa072ab40c0c649fbe089057e2f1337914862",
+      "bytes": 1315,
+      "line_count": 36,
+      "selection": null
+    },
+    {
+      "path": "packaging/flatpak/host-tool-wrapper",
+      "sha256": "f0a922f4d99760de7ea5747c96359ae40dac2ccff682d4cbd5a8577ea6c17ab6",
+      "bytes": 268,
+      "line_count": 10,
+      "selection": null
+    },
+    {
+      "path": "src/engine.rs",
+      "sha256": "cc2675eac8c46fe39f92ac677afbd0e27afbc9c8388ad10c93d710cd3f653505",
+      "bytes": 23432,
+      "line_count": 677,
+      "selection": null
+    },
+    {
+      "path": "src/main.rs",
+      "sha256": "ea93608982e289c03749ad79405faabcbbe2a0b0d43b168f51d675ad9e47e7d0",
+      "bytes": 44683,
+      "line_count": 1374,
+      "selection": null
+    },
+    {
+      "path": "src/model.rs",
+      "sha256": "f22d26697668902690aaaac82540cbd5747bd7a82bb0d2f1d0cfb0ed26a50a17",
+      "bytes": 18765,
+      "line_count": 689,
+      "selection": null
+    },
+    {
+      "path": "src/paths.rs",
+      "sha256": "228be0d72373fe9ceccaeea10e38a1bd9d352735df5b75dd2f78c5b5d778d22c",
+      "bytes": 6108,
+      "line_count": 212,
+      "selection": null
+    },
+    {
+      "path": "src/runtime.rs",
+      "sha256": "10536beb3e1291ab05f21958c1b57c2faeab07ec8bdf3ca6261ce9910f3bdfb4",
+      "bytes": 425,
+      "line_count": 14,
+      "selection": null
+    },
+    {
+      "path": "src/ui.rs",
+      "sha256": "28e414f7b3b0f8c56353ab61c99fc0c1e114a7f398901b1b65ffe97547730c45",
+      "bytes": 7194,
+      "line_count": 213,
+      "selection": null
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "dcccaf881dc1d5ba74634dd9270bf065f700cc584b00c0a56da9b81685260fd0",
+      "bytes": 938,
+      "line_count": 35,
+      "selection": null
+    }
+  ],
+  "images": [],
+  "ready": false,
+  "output": {
+    "verdict": "REVISE",
+    "claim_status": "PARTIAL: the mechanisms are present, but CI is deterministically blocked by manifest drift.",
+    "summary": "Source inspection supports bounded push-only Flatpak building, bundle installation/runtime commands, and protected manual VAAPI/NVENC matrix logic with exact encoder and no-fallback checks. The manifest-parity failure is a material CI defect.",
+    "material_defects": [
+      "[BLOCKER] .github/workflows/ci.yml:73 compares the release and CI Flatpak manifests, but packaging/flatpak/io.github.stranmor.MediaStudio.yml includes --filesystem=xdg-data/kio while the CI manifest omits it. The packaging job therefore aborts on every run; add the missing finish argument to the CI manifest (preferred) or deliberately revise the parity contract."
+    ],
+    "evidence_gaps": [
+      "External CI logs do not establish that the builder, bundle installation, and Flatpak runtime smoke completed.",
+      "No hardware-matrix run logs or evidence of provisioned trusted runners were supplied."
+    ],
+    "supported_claims": [
+      "Source-level proof: the Flatpak job is push-only, privileged only there, has a 60-minute job bound, invokes flatpak-builder, installs the bundle, and runs the packaged command inside Flatpak.",
+      "Source-level proof: the GPU workflow is workflow_dispatch-only, restricted to the upstream main ref, uses self-hosted backend-labelled matrix entries, disables hardware fallback, and verifies output/log markers.",
+      "Source-level proof: docs/ci/gpu-runners.md states explicit labels, device paths, drivers, permissions, and encoder requirements."
+    ],
+    "prohibited_claims": [
+      "Do not claim production Flatpak sandbox readiness or verified host integration from the --version/profile-list smoke.",
+      "Do not claim reproducible builds or universal VAAPI/NVENC availability."
+    ],
+    "required_changes": [
+      "Add --filesystem=xdg-data/kio to the CI Flatpak manifest so the existing parity check passes.",
+      "After correction, obtain successful push-CI Flatpak logs and approved VAAPI/NVENC matrix logs before claiming external smoke coverage."
+    ],
+    "residual_risks": [
+      "The intentional --filesystem=host, broad permissions, and flatpak-spawn host wrapper remain experimental host-integration risks.",
+      "Mutable runtime/action/dependency references remain unsuitable as reproducibility guarantees, consistent with policy.",
+      "Self-hosted GPU proof remains dependent on trusted runner provisioning and online hardware."
+    ]
+  }
+}

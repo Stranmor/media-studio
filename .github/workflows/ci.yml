@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
   rust:
     runs-on: ubuntu-latest
@@ -68,6 +71,8 @@ jobs:
             grep -F 'pkgver=0.2.1' packaging/arch/PKGBUILD
           fi
           ruby -e 'require "yaml"; manifest = YAML.load_file("packaging/flatpak/io.github.stranmor.MediaStudio.yml"); abort "bad app id" unless manifest["app-id"] == "io.github.stranmor.MediaStudio"; abort "missing candidate commit" unless manifest.dig("modules", 0, "sources", 0, "commit") == "63dc708153b76ab7f7527579f103ce24ac106872"'
+          ruby -e 'require "yaml"; release = YAML.load_file("packaging/flatpak/io.github.stranmor.MediaStudio.yml"); ci = YAML.load_file("packaging/flatpak/io.github.stranmor.MediaStudio.ci.yml"); release["modules"][0]["sources"] = [{"type" => "dir", "path" => "../.."}]; abort "CI Flatpak manifest drifted from release manifest" unless release == ci'
+          grep -F -- '--filesystem=xdg-data/kio' packaging/flatpak/io.github.stranmor.MediaStudio.ci.yml
           cargo metadata --no-deps --format-version 1 >/dev/null
           test -s packaging/flatpak/io.github.stranmor.MediaStudio.desktop
           test -x packaging/flatpak/host-tool-wrapper
@@ -77,3 +82,36 @@ jobs:
           git show 63dc708153b76ab7f7527579f103ce24ac106872:Cargo.toml | grep -F 'version = "0.2.1"'
           git cat-file -e 63dc708153b76ab7f7527579f103ce24ac106872:packaging/flatpak/host-tool-wrapper
           git cat-file -e 63dc708153b76ab7f7527579f103ce24ac106872:packaging/flatpak/io.github.stranmor.MediaStudio.desktop
+
+  flatpak:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-48
+      options: --privileged
+    steps:
+      - uses: actions/checkout@main
+      - name: Verify Flatpak toolchain
+        run: |
+          set -eu
+          flatpak --version
+          flatpak-builder --version
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@master
+        with:
+          bundle: media-studio.flatpak
+          manifest-path: packaging/flatpak/io.github.stranmor.MediaStudio.ci.yml
+          repository-name: flathub
+          repository-url: https://flathub.org/repo/flathub.flatpakrepo
+          upload-artifact: false
+          verbose: true
+      - name: Install and run Flatpak smoke
+        run: |
+          set -eu
+          timeout 900s flatpak install --user --noninteractive --or-update ./media-studio.flatpak
+          flatpak info --user io.github.stranmor.MediaStudio
+          version_output="$(timeout 30s flatpak run --command=media-studio io.github.stranmor.MediaStudio --version)"
+          printf '%s\n' "$version_output"
+          printf '%s\n' "$version_output" | grep -F 'media-studio 0.2.1'
+          timeout 30s flatpak run --command=media-studio io.github.stranmor.MediaStudio profile list >/tmp/media-studio-flatpak-profiles.txt
+          grep -F $'video_mp4\t' /tmp/media-studio-flatpak-profiles.txt

@@ -1,0 +1,36 @@
+name: GPU Hardware Smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hardware:
+    name: ${{ matrix.backend }}
+    if: github.repository == 'Stranmor/media-studio' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, linux, gpu, '${{ matrix.backend }}']
+    environment: gpu-hardware
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - backend: vaapi
+            vaapi_device: /dev/dri/renderD128
+          - backend: nvenc
+            vaapi_device: ''
+    steps:
+      - uses: actions/checkout@main
+      - name: Verify runner tools
+        run: |
+          set -eu
+          command -v cargo
+          command -v ffmpeg
+          command -v ffprobe
+          command -v systemd-run
+          command -v zenity || command -v kdialog
+      - name: Run real hardware conversion
+        shell: bash
+        run: packaging/gpu/hardware-smoke.sh '${{ matrix.backend }}' '${{ matrix.vaapi_device }}'

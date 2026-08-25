@@ -1,3 +1,372 @@
+# Independent CI and hardware review
+
+Review the current Media Studio changes for real Flatpak-builder/runtime smoke coverage and VAAPI/NVENC GPU matrix coverage. Be defect-first and inspect the exact supplied files.
+
+Acceptance criteria:
+
+1. The normal CI workflow must invoke a real Flatpak builder, install the resulting bundle, and run the packaged binary inside Flatpak; static YAML checks alone are insufficient.
+2. The Flatpak job must remain bounded and must not claim host integration or production sandbox readiness from a `--version`/profile smoke alone. The broad host permissions are intentional for this explicitly experimental host-integration artifact; treat them as a claim-boundary risk, not as a defect unless the workflow claims production sandbox readiness.
+3. The GPU workflow must be isolated from untrusted pull requests, use a real self-hosted runner matrix, verify exact encoders, run the selected hardware profile with software fallback disabled, and require a verified output without fallback markers.
+4. Runner labels and device requirements must be explicit enough for an operator to provision the two matrix entries without guessing.
+5. Shell, YAML, Rust, and repository-consumer behavior must have no material correctness or safety defect introduced by these changes.
+
+Project policy intentionally uses live-at-head dependency and action references, including the Flatpak runtime branch `master` and mutable upstream action branches. Do not require version pinning as a correction; check instead that protected-ref conditions and claim boundaries prevent those choices from being misrepresented as reproducibility guarantees. The privileged Flatpak builder container is an upstream builder requirement and is allowed only on push events, never on pull requests.
+
+The packaging job compares the release manifest with `io.github.stranmor.MediaStudio.ci.yml` after replacing only the git source with the current checkout directory, and explicitly checks `--filesystem=xdg-data/kio`; treat that parity contract as satisfied when the supplied files contain those checks.
+
+Return material defects first with severity, exact file/line or contract, impact, and the smallest systemic correction. Separate local proof, external CI proof, and claims that remain unverified. Return a typed verdict of `READY`, `REVISE`, `UNSUPPORTED`, or `UNCERTAIN`.
+
+# Exact claim under review
+
+Media Studio main has a bounded current-checkout Flatpak-builder/runtime smoke job and a protected manual VAAPI/NVENC self-hosted hardware matrix. This claim is limited to source-level workflow correctness and does not claim production Flatpak sandbox readiness, host integration readiness, reproducible builds, or universal GPU availability.
+
+# Exact bound sources
+
+--- BEGIN .github/workflows/ci.yml (full file) ---
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
+      - run: cargo build --release
+
+  kde-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - name: Install KDE and media dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes dbus-x11 dolphin ffmpeg imagemagick kio-extras xvfb zenity
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release
+      - name: Verify installed Dolphin consumer and conversion
+        shell: bash
+        run: |
+          set -euo pipefail
+          proof_dir="$(mktemp -d)"
+          mkdir -p "$proof_dir/in" "$proof_dir/out" "$proof_dir/home"
+          ffmpeg -hide_banner -loglevel error -f lavfi -i testsrc2=size=320x240:rate=10:duration=1 -c:v libx264 "$proof_dir/in/input.mp4"
+          export HOME="$proof_dir/home"
+          export XDG_CONFIG_HOME="$HOME/.config"
+          export XDG_DATA_HOME="$HOME/.local/share"
+          export XDG_STATE_HOME="$HOME/.local/state"
+          dbus-run-session -- target/release/media-studio install
+          test "$(find "$XDG_DATA_HOME/kio/servicemenus" -name 'media-studio-*.desktop' | wc -l)" -eq 3
+          dbus-run-session -- target/release/media-studio run --job-id ci-kde-proof --profile video_mp4 -- "$proof_dir/in/input.mp4"
+          test -s "$proof_dir/in/input.converted-1.mp4"
+          ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1 "$proof_dir/in/input.converted-1.mp4"
+          cache_builder="$(command -v kbuildsycoca6 || command -v kbuildsycoca5)"
+          "$cache_builder" --noincremental
+          set +e
+          timeout 12s xvfb-run -a dbus-run-session -- dolphin --new-window "$proof_dir/in"
+          dolphin_exit=$?
+          set -e
+          test "$dolphin_exit" -eq 0 -o "$dolphin_exit" -eq 124
+
+  packaging:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Validate packaging manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n packaging/arch/PKGBUILD
+          if command -v makepkg >/dev/null 2>&1; then
+            (cd packaging/arch && makepkg --packagelist | grep -F 'media-studio-0.2.1-1-')
+          else
+            grep -F 'pkgname=media-studio' packaging/arch/PKGBUILD
+            grep -F 'pkgver=0.2.1' packaging/arch/PKGBUILD
+          fi
+          ruby -e 'require "yaml"; manifest = YAML.load_file("packaging/flatpak/io.github.stranmor.MediaStudio.yml"); abort "bad app id" unless manifest["app-id"] == "io.github.stranmor.MediaStudio"; abort "missing candidate commit" unless manifest.dig("modules", 0, "sources", 0, "commit") == "63dc708153b76ab7f7527579f103ce24ac106872"'
+          ruby -e 'require "yaml"; release = YAML.load_file("packaging/flatpak/io.github.stranmor.MediaStudio.yml"); ci = YAML.load_file("packaging/flatpak/io.github.stranmor.MediaStudio.ci.yml"); release["modules"][0]["sources"] = [{"type" => "dir", "path" => "../.."}]; abort "CI Flatpak manifest drifted from release manifest" unless release == ci'
+          grep -F -- '--filesystem=xdg-data/kio' packaging/flatpak/io.github.stranmor.MediaStudio.ci.yml
+          cargo metadata --no-deps --format-version 1 >/dev/null
+          test -s packaging/flatpak/io.github.stranmor.MediaStudio.desktop
+          test -x packaging/flatpak/host-tool-wrapper
+          grep -F 'for tool in ffmpeg ffprobe magick systemd-run systemctl kbuildsycoca6 kbuildsycoca5 zenity kdialog; do ln -s media-studio-host-tool /app/bin/$tool; done' packaging/flatpak/io.github.stranmor.MediaStudio.yml
+          git fetch --no-tags --depth=1 origin 63dc708153b76ab7f7527579f103ce24ac106872
+          git cat-file -e 63dc708153b76ab7f7527579f103ce24ac106872:Cargo.toml
+          git show 63dc708153b76ab7f7527579f103ce24ac106872:Cargo.toml | grep -F 'version = "0.2.1"'
+          git cat-file -e 63dc708153b76ab7f7527579f103ce24ac106872:packaging/flatpak/host-tool-wrapper
+          git cat-file -e 63dc708153b76ab7f7527579f103ce24ac106872:packaging/flatpak/io.github.stranmor.MediaStudio.desktop
+
+  flatpak:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-48
+      options: --privileged
+    steps:
+      - uses: actions/checkout@main
+      - name: Verify Flatpak toolchain
+        run: |
+          set -eu
+          flatpak --version
+          flatpak-builder --version
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@master
+        with:
+          bundle: media-studio.flatpak
+          manifest-path: packaging/flatpak/io.github.stranmor.MediaStudio.ci.yml
+          repository-name: flathub
+          repository-url: https://flathub.org/repo/flathub.flatpakrepo
+          upload-artifact: false
+          verbose: true
+      - name: Install and run Flatpak smoke
+        run: |
+          set -eu
+          timeout 900s flatpak install --user --noninteractive --or-update ./media-studio.flatpak
+          flatpak info --user io.github.stranmor.MediaStudio
+          version_output="$(timeout 30s flatpak run --command=media-studio io.github.stranmor.MediaStudio --version)"
+          printf '%s\n' "$version_output"
+          printf '%s\n' "$version_output" | grep -F 'media-studio 0.2.1'
+          timeout 30s flatpak run --command=media-studio io.github.stranmor.MediaStudio profile list >/tmp/media-studio-flatpak-profiles.txt
+          grep -F $'video_mp4\t' /tmp/media-studio-flatpak-profiles.txt
+
+--- END .github/workflows/ci.yml ---
+[bound full-file sha256: 23d360d8656cbc939e16f436e4b978b3e12c003a694aa2499561a6a7baaa9967]
+
+--- BEGIN .github/workflows/gpu.yml (full file) ---
+name: GPU Hardware Smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hardware:
+    name: ${{ matrix.backend }}
+    if: github.repository == 'Stranmor/media-studio' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, linux, gpu, '${{ matrix.backend }}']
+    environment: gpu-hardware
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - backend: vaapi
+            vaapi_device: /dev/dri/renderD128
+          - backend: nvenc
+            vaapi_device: ''
+    steps:
+      - uses: actions/checkout@main
+      - name: Verify runner tools
+        run: |
+          set -eu
+          command -v cargo
+          command -v ffmpeg
+          command -v ffprobe
+          command -v systemd-run
+          command -v zenity || command -v kdialog
+      - name: Run real hardware conversion
+        shell: bash
+        run: packaging/gpu/hardware-smoke.sh '${{ matrix.backend }}' '${{ matrix.vaapi_device }}'
+
+--- END .github/workflows/gpu.yml ---
+[bound full-file sha256: 8bcffdce487804467d925a8be54d1a2b6a1203a872b9b43cca75bc36fbcabdd1]
+
+--- BEGIN packaging/gpu/hardware-smoke.sh (full file) ---
+#!/usr/bin/env bash
+set -euo pipefail
+
+backend=${1:?backend is required: vaapi or nvenc}
+vaapi_device=${2:-}
+
+case "$backend" in
+  vaapi)
+    test -n "$vaapi_device"
+    test -c "$vaapi_device"
+    encoder=h264_vaapi
+    profile=video_mp4_vaapi
+    export MEDIA_STUDIO_VAAPI_DEVICE="$vaapi_device"
+    ;;
+  nvenc)
+    encoder=h264_nvenc
+    profile=video_mp4_nvenc
+    ;;
+  *)
+    printf 'unsupported backend: %s\n' "$backend" >&2
+    exit 2
+    ;;
+esac
+
+encoder_listing="$(ffmpeg -hide_banner -encoders 2>/dev/null)"
+grep -Eq "^[[:space:]]*[A-Z.]{6}[[:space:]]+${encoder}([[:space:]]|$)" <<<"$encoder_listing"
+command -v systemd-run >/dev/null
+
+cargo build --release
+
+proof_dir="$(mktemp -d)"
+trap 'rm -rf "$proof_dir"' EXIT
+mkdir -p "$proof_dir/input" "$proof_dir/output" "$proof_dir/home" "$proof_dir/state"
+export HOME="$proof_dir/home"
+export XDG_CONFIG_HOME="$HOME/.config"
+export XDG_STATE_HOME="$proof_dir/state"
+
+ffmpeg -hide_banner -loglevel error \
+  -f lavfi -i testsrc2=size=640x360:rate=24:duration=2 \
+  -f lavfi -i sine=frequency=1000:sample_rate=48000:duration=2 \
+  -shortest -c:v libx264 -c:a aac "$proof_dir/input/fixture.mkv"
+
+target/release/media-studio run \
+  --job-id "gpu-${backend}" \
+  --profile "$profile" \
+  --hardware-fallback=false \
+  --output-dir "$proof_dir/output" \
+  -- "$proof_dir/input/fixture.mkv"
+
+output_file="$(find "$proof_dir/output" -maxdepth 1 -type f -name '*.mp4' -print -quit)"
+test -n "$output_file"
+test -s "$output_file"
+ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1 "$output_file"
+ffmpeg -hide_banner -nostdin -loglevel error -xerror -i "$output_file" \
+  -map 0:v? -map 0:a? -f null -
+
+log_file="$XDG_STATE_HOME/media-studio/jobs/gpu-${backend}.log"
+backend_label="$(printf '%s' "$backend" | tr '[:lower:]' '[:upper:]')"
+grep -Fx "HARDWARE_USED=${backend_label} ENCODER=${encoder}" "$log_file"
+grep -F "$encoder" "$log_file"
+if [ "$backend" = vaapi ]; then
+  grep -F -- "$vaapi_device" "$log_file"
+fi
+if grep -Fq 'HARDWARE_FALLBACK=' "$log_file"; then
+  printf 'hardware fallback was used unexpectedly\n' >&2
+  exit 1
+fi
+grep -Fx 'RESULT=verified' "$log_file"
+
+--- END packaging/gpu/hardware-smoke.sh ---
+[bound full-file sha256: c89e605c0efdbfe2fd080f5386ad4a4cd072c82d3d6ec22c5515bbcab552f74f]
+
+--- BEGIN docs/ci/gpu-runners.md (full file) ---
+# GPU CI runners
+
+The GPU workflow is manual by design. It runs only on trusted self-hosted Linux runners and never executes untrusted pull-request code on a private machine.
+
+## Runner labels
+
+Each runner must have the following labels:
+
+- `self-hosted`
+- `linux`
+- `gpu`
+- exactly one backend label: `vaapi` or `nvenc`
+
+Both runners must provide Rust/Cargo, `ffmpeg`, `ffprobe`, `systemd-run`, and a dialog backend (`zenity` or `kdialog`). The VAAPI runner must expose the character device `/dev/dri/renderD128`, grant the runner user access to it, and provide an FFmpeg build with `h264_vaapi`. The NVENC runner must expose a working NVIDIA driver, `nvidia-smi`, the NVIDIA device nodes (`/dev/nvidia0`, `/dev/nvidiactl`, and `/dev/nvidia-uvm` when present), runner-user access to those nodes, and an FFmpeg build with `h264_nvenc`.
+
+## What the workflow proves
+
+`packaging/gpu/hardware-smoke.sh` creates a real video fixture, invokes the selected Media Studio hardware profile with `--hardware-fallback=false`, verifies the committed MP4 with `ffprobe`, and requires a `RESULT=verified` log without `HARDWARE_FALLBACK`.
+
+The matrix is intentionally separate from the normal CI workflow. If no trusted runner is online, the GPU proof is waiting/unverified; normal build and packaging CI remains independent.
+
+--- END docs/ci/gpu-runners.md ---
+[bound full-file sha256: 7aa0665668e302b71b187487e872e3b1afb7a850195ff07d48466cff8c2ceeeb]
+
+--- BEGIN packaging/flatpak/io.github.stranmor.MediaStudio.yml (full file) ---
+app-id: io.github.stranmor.MediaStudio
+runtime: org.freedesktop.Platform
+runtime-version: master
+sdk: org.freedesktop.Sdk
+command: media-studio
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+finish-args:
+  - --share=ipc
+  - --socket=session-bus
+  - --device=dri
+  - --filesystem=home
+  - --filesystem=host
+  - --filesystem=xdg-config/media-studio:create
+  - --filesystem=xdg-config/systemd/user
+  - --filesystem=xdg-data/kio
+  - --filesystem=xdg-state/media-studio:create
+  - --talk-name=org.freedesktop.systemd1
+  - --talk-name=org.freedesktop.Flatpak
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+modules:
+  - name: media-studio
+    buildsystem: simple
+    build-options:
+      build-args:
+        - --share=network
+    sources:
+      - type: git
+        url: https://github.com/Stranmor/media-studio.git
+        commit: 63dc708153b76ab7f7527579f103ce24ac106872
+    build-commands:
+      - cargo build --release
+      - install -Dm755 target/release/media-studio /app/bin/media-studio
+      - install -Dm755 packaging/flatpak/host-tool-wrapper /app/bin/media-studio-host-tool
+      - for tool in ffmpeg ffprobe magick systemd-run systemctl kbuildsycoca6 kbuildsycoca5 zenity kdialog; do ln -s media-studio-host-tool /app/bin/$tool; done
+      - install -Dm644 packaging/flatpak/io.github.stranmor.MediaStudio.desktop /app/share/applications/io.github.stranmor.MediaStudio.desktop
+
+--- END packaging/flatpak/io.github.stranmor.MediaStudio.yml ---
+[bound full-file sha256: 9081222011abe6ef4d75aade30fe5ab08ad158850fb7a76f4d57c3313209b450]
+
+--- BEGIN packaging/flatpak/io.github.stranmor.MediaStudio.ci.yml (full file) ---
+app-id: io.github.stranmor.MediaStudio
+runtime: org.freedesktop.Platform
+runtime-version: master
+sdk: org.freedesktop.Sdk
+command: media-studio
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+finish-args:
+  - --share=ipc
+  - --socket=session-bus
+  - --device=dri
+  - --filesystem=home
+  - --filesystem=host
+  - --filesystem=xdg-config/media-studio:create
+  - --filesystem=xdg-config/systemd/user
+  - --filesystem=xdg-data/kio
+  - --filesystem=xdg-state/media-studio:create
+  - --talk-name=org.freedesktop.systemd1
+  - --talk-name=org.freedesktop.Flatpak
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+modules:
+  - name: media-studio
+    buildsystem: simple
+    build-options:
+      build-args:
+        - --share=network
+    sources:
+      - type: dir
+        path: ../..
+    build-commands:
+      - cargo build --release
+      - install -Dm755 target/release/media-studio /app/bin/media-studio
+      - install -Dm755 packaging/flatpak/host-tool-wrapper /app/bin/media-studio-host-tool
+      - for tool in ffmpeg ffprobe magick systemd-run systemctl kbuildsycoca6 kbuildsycoca5 zenity kdialog; do ln -s media-studio-host-tool /app/bin/$tool; done
+      - install -Dm644 packaging/flatpak/io.github.stranmor.MediaStudio.desktop /app/share/applications/io.github.stranmor.MediaStudio.desktop
+
+--- END packaging/flatpak/io.github.stranmor.MediaStudio.ci.yml ---
+[bound full-file sha256: 8706701b983c0e7d9e1c10a99a3fa072ab40c0c649fbe089057e2f1337914862]
+
+--- BEGIN src/engine.rs (full file) ---
 use anyhow::{bail, Context, Result};
 use std::fs::{self, File, OpenOptions};
 use std::io::Write;
@@ -675,3 +1044,6 @@ mod tests {
         assert!(fallback.windows(2).any(|pair| pair == ["-b:a", "128k"]));
     }
 }
+
+--- END src/engine.rs ---
+[bound full-file sha256: cc2675eac8c46fe39f92ac677afbd0e27afbc9c8388ad10c93d710cd3f653505]

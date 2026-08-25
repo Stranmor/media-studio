@@ -1,0 +1,130 @@
+{
+  "schema_version": 1,
+  "claim": "Media Studio CI now has real Flatpak-builder/runtime smoke coverage and a manual VAAPI/NVENC self-hosted GPU matrix with fail-closed hardware conversion proof.",
+  "submitted_at_unix_ms": 1787639266628,
+  "reviewed_at_unix_ms": 1787640098790,
+  "endpoint": "https://antigravity.quantumind.ru/v1/responses",
+  "http_status": 200,
+  "request_sha256": "5df32689e6dcd6b62687d36970206b6b46c2d8441d4b205337af6300cb762893",
+  "initial_request_sha256": "5df32689e6dcd6b62687d36970206b6b46c2d8441d4b205337af6300cb762893",
+  "transport": "json",
+  "prompt_sha256": "f3773e98e1ffd0022acca0b5fec01bfa54b2f2139c831451fdc56c2a9477127a",
+  "review_input_sha256": "22ab375ca4c96da9d712fc6a0528d1fc6ba3053c4772324825a524638883ac5f",
+  "response_sha256": "b6a15e7946e1304b75be494a3f00a6e28385fef53612767c7c8f51a70fd42f5b",
+  "response_stream_sha256": "a3e7f6e822a9575781c7f9003d1ee72d4e9b70a74028c74eef5d9f67f9fff172",
+  "model_preference": [
+    "gpt-5.6-luna"
+  ],
+  "model_requested": "gpt-5.6-luna",
+  "model_returned": "gpt-5.6-luna",
+  "reasoning_effort_requested": "max",
+  "response_id": "resp_0267d77185a9bb6c016a8d35e3f31487d1936f584c47c289ad",
+  "response_status": "completed",
+  "sources": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "e995198e1264b6a54195b0d818fa52b663f5eaf4fd907f2d4b746c405cc015e8",
+      "bytes": 5283,
+      "line_count": 110,
+      "selection": null
+    },
+    {
+      "path": ".github/workflows/gpu.yml",
+      "sha256": "add00aa9b41cd27060084ae2af4a6e6102021036b4c5c34f8841eb235c1e8714",
+      "bytes": 796,
+      "line_count": 30,
+      "selection": null
+    },
+    {
+      "path": "packaging/gpu/hardware-smoke.sh",
+      "sha256": "3d15177dcbf6af4f22953035856e230721db97ce02c1a352c21d82124c3fc0f6",
+      "bytes": 1844,
+      "line_count": 60,
+      "selection": null
+    },
+    {
+      "path": "docs/ci/gpu-runners.md",
+      "sha256": "480c8fc5b040cd2753c1c1a7a7be6b0b231314c652135fd4d2e5b7f100e667cb",
+      "bytes": 1076,
+      "line_count": 20,
+      "selection": null
+    },
+    {
+      "path": "packaging/flatpak/io.github.stranmor.MediaStudio.yml",
+      "sha256": "9081222011abe6ef4d75aade30fe5ab08ad158850fb7a76f4d57c3313209b450",
+      "bytes": 1410,
+      "line_count": 37,
+      "selection": null
+    },
+    {
+      "path": "src/engine.rs",
+      "sha256": "1c032309f316b41f199593d5a90584f83e7f7f1b83f4ac506b7026f2459d832a",
+      "bytes": 22738,
+      "line_count": 654,
+      "selection": null
+    },
+    {
+      "path": "src/main.rs",
+      "sha256": "ea93608982e289c03749ad79405faabcbbe2a0b0d43b168f51d675ad9e47e7d0",
+      "bytes": 44683,
+      "line_count": 1374,
+      "selection": null
+    },
+    {
+      "path": "Cargo.toml",
+      "sha256": "dcccaf881dc1d5ba74634dd9270bf065f700cc584b00c0a56da9b81685260fd0",
+      "bytes": 938,
+      "line_count": 35,
+      "selection": null
+    }
+  ],
+  "images": [],
+  "ready": false,
+  "output": {
+    "verdict": "REVISE",
+    "claim_status": "PARTIAL: the intended workflow shapes are present, but the exact claim is not acceptance-complete.",
+    "summary": "The files show a real Flatpak-builder/install/run path, a manual self-hosted matrix, exact encoder availability checks, and an application fallback-disabled path. Stale Flatpak input, missing timeout, false verification semantics, incomplete encoder proof, incomplete runner requirements, and sandbox/trust defects block the exact claim.",
+    "material_defects": [
+      "HIGH — current-source contract — .github/workflows/ci.yml:92-109 and packaging/flatpak/io.github.stranmor.MediaStudio.yml:29-32: Flatpak-builder uses the fixed commit 63dc708153b76ab7f7527579f103ce24ac106872, not the checked-out revision, with no equality to github.sha. Current Rust, manifest, or wrapper changes can therefore be ignored. Correction: use a CI-only checkout-directory source or bind and assert the event SHA.",
+      "HIGH — bounded-job contract — .github/workflows/ci.yml:80-109: the Flatpak job has no explicit timeout-minutes and its builder/install/run operations have no command timeout. A network, runtime, or application hang is not bounded by the repository contract. Correction: add an explicit job timeout and bounded smoke commands.",
+      "HIGH — verification contract — src/engine.rs: the RESULT=verified log line is written even when config.verify_results is false; packaging/gpu/hardware-smoke.sh:49-60 only checks file size, ffprobe duration, and that marker. This does not fail closed on disabled or incomplete verification. Correction: emit RESULT=verified only after verification, fail when verification is disabled, and add independent full decode plus an exact-line marker check.",
+      "HIGH — exact-encoder-use contract — packaging/gpu/hardware-smoke.sh:24-25,42-60 checks that FFmpeg advertises h264_vaapi or h264_nvenc, but does not assert that the selected profile command actually uses that encoder or the VAAPI device. HARDWARE=... is logged during capability selection, before invocation. Correction: validate backend-to-profile encoder mapping in Rust, log the exact selected encoder/device, and assert the command/output contract in the script.",
+      "MEDIUM — runner contract — .github/workflows/gpu.yml:21-27 and docs/ci/gpu-runners.md: the application requires systemd-run via engine::ensure_tools, but the workflow preflight and runner document do not require it. NVENC requirements also omit exact NVIDIA device nodes, permissions, driver/toolchain expectations, and Rust requirements. Correction: add preflight checks and explicit per-runner provisioning requirements.",
+      "HIGH — sandbox safety contract — packaging/flatpak/io.github.stranmor.MediaStudio.yml:9-20 grants filesystem=host and broad host/system D-Bus access. The installed app is not least-privilege or production-sandbox-ready, and the version/profile smoke does not justify those permissions. Correction: narrow permissions in the production manifest, or isolate host integration in an explicitly non-production manifest.",
+      "HIGH — CI trust contract — .github/workflows/ci.yml:82-84 runs pull-request-controlled Flatpak build commands in a privileged container with network access. Correction: remove unnecessary privilege, isolate the build, restrict token permissions, and avoid exposing sensitive credentials.",
+      "MEDIUM — self-hosted trust/supply-chain contract — .github/workflows/gpu.yml:3-4,20 and action references throughout the workflows allow manual dispatch from the selected ref and use mutable @main/@master action refs. Manual-only is event isolation, not a protected-ref guarantee. Correction: pin action SHAs, set contents:read, and gate GPU execution to a protected ref/environment.",
+      "MEDIUM — reproducibility contract — packaging/flatpak/io.github.stranmor.MediaStudio.yml:2-3 uses the mutable runtime-version master. Correction: pin a supported stable runtime branch/ref."
+    ],
+    "evidence_gaps": [
+      "No external GitHub Actions logs, Flatpak bundle result, GPU runner result, output, or job log are supplied.",
+      "The supplied files omit src/model.rs, src/paths.rs, src/runtime.rs, src/ui.rs, and host-tool-wrapper contents/mode, so profile mappings, verification defaults, log paths, wrapper safety, and headless behavior are unverified.",
+      "Runner availability, device ACLs, NVIDIA device nodes, and actual VAAPI/NVENC driver operation are unverified."
+    ],
+    "supported_claims": [
+      "LOCAL FILE-LEVEL PROOF: .github/workflows/ci.yml invokes Flatpak-builder with a bundle, installs it, and runs the packaged command inside Flatpak.",
+      "LOCAL FILE-LEVEL PROOF: gpu.yml is workflow_dispatch-only, defines VAAPI/NVENC matrix entries, uses backend runner labels, and has a 30-minute GPU timeout.",
+      "LOCAL CODE-PATH PROOF: --hardware-fallback=false reaches runtime configuration, and engine.rs does not perform software retry when fallback is disabled.",
+      "LOCAL FILE-LEVEL PROOF: the native KDE smoke performs installation, conversion, KIO menu checks, and a Dolphin launch, but it is not a Flatpak consumer test."
+    ],
+    "prohibited_claims": [
+      "Do not claim current changes are Flatpak-runtime tested until the builder consumes the current checkout.",
+      "Do not claim Flatpak Dolphin/KIO/systemd/host-tool integration works; only version/profile commands run in the package.",
+      "Do not claim production sandbox readiness while filesystem=host and broad host permissions remain.",
+      "Do not claim actual VAAPI/NVENC encoder use solely from encoder availability and HARDWARE log markers.",
+      "Do not claim the manual GPU matrix passed without successful external runner logs and verified output evidence."
+    ],
+    "required_changes": [
+      "Build the current checkout with a CI-specific Flatpak manifest, pin the runtime, and add an explicit Flatpak job timeout.",
+      "Make verification markers truthful and require full output decode in the GPU smoke.",
+      "Assert exact backend encoder/device use in the application log and script.",
+      "Document and preflight systemd-run, Rust, device nodes/ACLs, drivers, and exact FFmpeg capabilities for both runners.",
+      "Protect self-hosted dispatch, pin all actions, restrict token permissions, and reduce or isolate privileged PR builds.",
+      "Remove or explicitly scope broad Flatpak host permissions and preserve auditable smoke logs/output."
+    ],
+    "residual_risks": [
+      "The GPU workflow remains manual and can be waiting/unverified when no trusted runner is online.",
+      "Media metadata alone cannot prove encoder provenance; application command/selection evidence is required.",
+      "Flatpak host-wrapper behavior and packaged consumer integration remain untested by the supplied smoke."
+    ]
+  }
+}
