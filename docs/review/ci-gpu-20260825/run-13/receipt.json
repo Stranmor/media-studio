@@ -1,0 +1,105 @@
+{
+  "schema_version": 1,
+  "claim": "Media Studio main has a bounded current-checkout Flatpak-builder/runtime smoke job using the required Flathub-compatible Freedesktop runtime branch and valid Flatpak filesystem permissions, plus a protected manual VAAPI/NVENC self-hosted hardware matrix. This claim excludes production Flatpak sandbox readiness, host integration readiness, reproducible builds, and universal GPU availability.",
+  "submitted_at_unix_ms": 1787699417677,
+  "reviewed_at_unix_ms": 1787700080266,
+  "endpoint": "https://antigravity.quantumind.ru/v1/responses",
+  "http_status": 200,
+  "request_sha256": "484fc4aec338e42e812f150a62871660fc1ed07b17b784b19d5bebd15402c662",
+  "initial_request_sha256": "484fc4aec338e42e812f150a62871660fc1ed07b17b784b19d5bebd15402c662",
+  "transport": "json",
+  "prompt_sha256": "b4e06c09f2e467d765ea1d5cbe7c4e6578daac3be47bff2e9826a0e0f21e4690",
+  "review_input_sha256": "893c37b1004ed2be038139c345cc7018ea3395a892f1a9e1014712db9a76f1b5",
+  "response_sha256": "631064ce7858cedafc2be8882279e46bae9ecef773bf54c11d51b03efd386c9c",
+  "response_stream_sha256": "b1f8163076beae0bcdc0acda7629073dbd53908229bf545f269ca3cf04b5639f",
+  "model_preference": [
+    "gpt-5.6-luna"
+  ],
+  "model_requested": "gpt-5.6-luna",
+  "model_returned": "gpt-5.6-luna",
+  "reasoning_effort_requested": "max",
+  "response_id": "resp_047b9ea8820718a5016a8e20dcaecc87d0b12de66610d35e13",
+  "response_status": "completed",
+  "sources": [
+    {
+      "path": ".github/workflows/ci.yml",
+      "sha256": "23d360d8656cbc939e16f436e4b978b3e12c003a694aa2499561a6a7baaa9967",
+      "bytes": 5871,
+      "line_count": 117,
+      "selection": null
+    },
+    {
+      "path": ".github/workflows/gpu.yml",
+      "sha256": "8bcffdce487804467d925a8be54d1a2b6a1203a872b9b43cca75bc36fbcabdd1",
+      "bytes": 978,
+      "line_count": 36,
+      "selection": null
+    },
+    {
+      "path": "packaging/gpu/hardware-smoke.sh",
+      "sha256": "b6e6470cd69687baaa5fbcb2987c8c9a077807a32548c5eb19fb28b77cefb3e8",
+      "bytes": 2212,
+      "line_count": 70,
+      "selection": null
+    },
+    {
+      "path": "docs/ci/gpu-runners.md",
+      "sha256": "583e85d4a3ad9fecbb2c338813c8fb70e836a40a50c74f5be16ad8b414657571",
+      "bytes": 1405,
+      "line_count": 20,
+      "selection": null
+    },
+    {
+      "path": "packaging/flatpak/io.github.stranmor.MediaStudio.yml",
+      "sha256": "102720169cf17784b290599895bee1714afb68108a2e0caa210617e72db053a6",
+      "bytes": 1364,
+      "line_count": 36,
+      "selection": null
+    },
+    {
+      "path": "packaging/flatpak/io.github.stranmor.MediaStudio.ci.yml",
+      "sha256": "5b57a6aff6f9922000693448c1b985a22261519bc39833fda6a55cba26755b8f",
+      "bytes": 1269,
+      "line_count": 35,
+      "selection": null
+    },
+    {
+      "path": "src/engine.rs",
+      "sha256": "2762d240f707ca9284d5337a8666d64067d899a2fc07976782db3a0c8517959c",
+      "bytes": 23518,
+      "line_count": 684,
+      "selection": null
+    }
+  ],
+  "images": [],
+  "ready": true,
+  "output": {
+    "verdict": "READY",
+    "claim_status": "Supported within the stated boundary; external execution results are not supplied.",
+    "summary": "The supplied files meet the scoped acceptance criteria: bounded push-only Flatpak-builder smoke, current-checkout manifest parity, protected manual VAAPI/NVENC matrix, exact encoder checks, fallback-disabled conversion, and verified-output gates. No material defect is evident.",
+    "material_defects": [],
+    "evidence_gaps": [
+      "No CI logs or artifacts verify an actual Flatpak build/install/run or successful hardware execution.",
+      "Environment protection, branch-protection settings, and live runner/device provisioning are external to the supplied files.",
+      "CLI/profile declarations and host-wrapper implementation are outside the bound."
+    ],
+    "supported_claims": [
+      "LOCAL PROOF: ci.yml:86-117 invokes the Flatpak-builder action, creates the bundle, installs it with a timeout, and runs the packaged command inside Flatpak.",
+      "LOCAL PROOF: both manifests use Freedesktop runtime 25.08; packaging checks enforce CI/release parity and xdg-data/kio.",
+      "LOCAL PROOF: gpu.yml:3-36 restricts execution to workflow_dispatch on the canonical main repository/ref and uses self-hosted backend labels; gpu-runners.md specifies device and tool requirements.",
+      "LOCAL PROOF: hardware-smoke.sh:24-69 checks exact encoders, disables fallback, verifies and decodes output, requires HARDWARE_USED/RESULT=verified, and rejects fallback markers.",
+      "EXTERNAL CI PROOF: not supplied; actual completion remains unverified."
+    ],
+    "prohibited_claims": [
+      "Production Flatpak sandbox readiness or host-integration readiness.",
+      "Reproducible builds from mutable action/dependency references.",
+      "Universal VAAPI/NVENC availability.",
+      "A passed external CI or hardware run without corresponding run evidence."
+    ],
+    "required_changes": [],
+    "residual_risks": [
+      "The intentionally broad Flatpak permissions and privileged push-only builder remain experimental host-integration risks.",
+      "GPU proof depends on correctly protected and provisioned self-hosted runners."
+    ]
+  }
+}

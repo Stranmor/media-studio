@@ -1,0 +1,1056 @@
+# Independent CI and hardware review
+
+Review the current Media Studio changes for real Flatpak-builder/runtime smoke coverage and VAAPI/NVENC GPU matrix coverage. Be defect-first and inspect the exact supplied files.
+
+Acceptance criteria:
+
+1. The normal CI workflow must invoke a real Flatpak builder, install the resulting bundle, and run the packaged binary inside Flatpak; static YAML checks alone are insufficient.
+2. The Flatpak job must remain bounded and must not claim host integration or production sandbox readiness from a `--version`/profile smoke alone. The broad host permissions are intentional for this explicitly experimental host-integration artifact; treat them as a claim-boundary risk, not as a defect unless the workflow claims production sandbox readiness.
+3. The GPU workflow must be isolated from untrusted pull requests, use a real self-hosted runner matrix, verify exact encoders, run the selected hardware profile with software fallback disabled, and require a verified output without fallback markers.
+4. Runner labels and device requirements must be explicit enough for an operator to provision the two matrix entries without guessing.
+5. Shell, YAML, Rust, and repository-consumer behavior must have no material correctness or safety defect introduced by these changes.
+
+Project policy intentionally uses live-at-head dependency and action references, including mutable upstream action branches. The Flatpak runtime branch is an explicit compatibility requirement of the Flatpak manifest because Flathub does not publish a `master` runtime; do not treat this required platform branch as a reproducible application dependency. Check instead that protected-ref conditions and claim boundaries prevent the mutable action references from being misrepresented as reproducibility guarantees. The privileged Flatpak builder container is an upstream builder requirement and is allowed only on push events, never on pull requests.
+
+The packaging job compares the release manifest with `io.github.stranmor.MediaStudio.ci.yml` after replacing only the git source with the current checkout directory, and explicitly checks `--filesystem=xdg-data/kio`; treat that parity contract as satisfied when the supplied files contain those checks.
+
+Return material defects first with severity, exact file/line or contract, impact, and the smallest systemic correction. Separate local proof, external CI proof, and claims that remain unverified. Return a typed verdict of `READY`, `REVISE`, `UNSUPPORTED`, or `UNCERTAIN`.
+
+# Exact claim under review
+
+Media Studio main has a bounded current-checkout Flatpak-builder/runtime smoke job using the required Flathub-compatible Freedesktop runtime branch and valid Flatpak filesystem permissions, plus a protected manual VAAPI/NVENC self-hosted hardware matrix. This claim excludes production Flatpak sandbox readiness, host integration readiness, reproducible builds, and universal GPU availability.
+
+# Exact bound sources
+
+--- BEGIN .github/workflows/ci.yml (full file) ---
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo test
+      - run: cargo build --release
+
+  kde-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - name: Install KDE and media dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes dbus-x11 dolphin ffmpeg imagemagick kio-extras xvfb zenity
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release
+      - name: Verify installed Dolphin consumer and conversion
+        shell: bash
+        run: |
+          set -euo pipefail
+          proof_dir="$(mktemp -d)"
+          mkdir -p "$proof_dir/in" "$proof_dir/out" "$proof_dir/home"
+          ffmpeg -hide_banner -loglevel error -f lavfi -i testsrc2=size=320x240:rate=10:duration=1 -c:v libx264 "$proof_dir/in/input.mp4"
+          export HOME="$proof_dir/home"
+          export XDG_CONFIG_HOME="$HOME/.config"
+          export XDG_DATA_HOME="$HOME/.local/share"
+          export XDG_STATE_HOME="$HOME/.local/state"
+          dbus-run-session -- target/release/media-studio install
+          test "$(find "$XDG_DATA_HOME/kio/servicemenus" -name 'media-studio-*.desktop' | wc -l)" -eq 3
+          dbus-run-session -- target/release/media-studio run --job-id ci-kde-proof --profile video_mp4 -- "$proof_dir/in/input.mp4"
+          test -s "$proof_dir/in/input.converted-1.mp4"
+          ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1 "$proof_dir/in/input.converted-1.mp4"
+          cache_builder="$(command -v kbuildsycoca6 || command -v kbuildsycoca5)"
+          "$cache_builder" --noincremental
+          set +e
+          timeout 12s xvfb-run -a dbus-run-session -- dolphin --new-window "$proof_dir/in"
+          dolphin_exit=$?
+          set -e
+          test "$dolphin_exit" -eq 0 -o "$dolphin_exit" -eq 124
+
+  packaging:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@main
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Validate packaging manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n packaging/arch/PKGBUILD
+          if command -v makepkg >/dev/null 2>&1; then
+            (cd packaging/arch && makepkg --packagelist | grep -F 'media-studio-0.2.1-1-')
+          else
+            grep -F 'pkgname=media-studio' packaging/arch/PKGBUILD
+            grep -F 'pkgver=0.2.1' packaging/arch/PKGBUILD
+          fi
+          ruby -e 'require "yaml"; manifest = YAML.load_file("packaging/flatpak/io.github.stranmor.MediaStudio.yml"); abort "bad app id" unless manifest["app-id"] == "io.github.stranmor.MediaStudio"; abort "missing candidate commit" unless manifest.dig("modules", 0, "sources", 0, "commit") == "63dc708153b76ab7f7527579f103ce24ac106872"'
+          ruby -e 'require "yaml"; release = YAML.load_file("packaging/flatpak/io.github.stranmor.MediaStudio.yml"); ci = YAML.load_file("packaging/flatpak/io.github.stranmor.MediaStudio.ci.yml"); release["modules"][0]["sources"] = [{"type" => "dir", "path" => "../.."}]; abort "CI Flatpak manifest drifted from release manifest" unless release == ci'
+          grep -F -- '--filesystem=xdg-data/kio' packaging/flatpak/io.github.stranmor.MediaStudio.ci.yml
+          cargo metadata --no-deps --format-version 1 >/dev/null
+          test -s packaging/flatpak/io.github.stranmor.MediaStudio.desktop
+          test -x packaging/flatpak/host-tool-wrapper
+          grep -F 'for tool in ffmpeg ffprobe magick systemd-run systemctl kbuildsycoca6 kbuildsycoca5 zenity kdialog; do ln -s media-studio-host-tool /app/bin/$tool; done' packaging/flatpak/io.github.stranmor.MediaStudio.yml
+          git fetch --no-tags --depth=1 origin 63dc708153b76ab7f7527579f103ce24ac106872
+          git cat-file -e 63dc708153b76ab7f7527579f103ce24ac106872:Cargo.toml
+          git show 63dc708153b76ab7f7527579f103ce24ac106872:Cargo.toml | grep -F 'version = "0.2.1"'
+          git cat-file -e 63dc708153b76ab7f7527579f103ce24ac106872:packaging/flatpak/host-tool-wrapper
+          git cat-file -e 63dc708153b76ab7f7527579f103ce24ac106872:packaging/flatpak/io.github.stranmor.MediaStudio.desktop
+
+  flatpak:
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-48
+      options: --privileged
+    steps:
+      - uses: actions/checkout@main
+      - name: Verify Flatpak toolchain
+        run: |
+          set -eu
+          flatpak --version
+          flatpak-builder --version
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@master
+        with:
+          bundle: media-studio.flatpak
+          manifest-path: packaging/flatpak/io.github.stranmor.MediaStudio.ci.yml
+          repository-name: flathub
+          repository-url: https://flathub.org/repo/flathub.flatpakrepo
+          upload-artifact: false
+          verbose: true
+      - name: Install and run Flatpak smoke
+        run: |
+          set -eu
+          timeout 900s flatpak install --user --noninteractive --or-update ./media-studio.flatpak
+          flatpak info --user io.github.stranmor.MediaStudio
+          version_output="$(timeout 30s flatpak run --command=media-studio io.github.stranmor.MediaStudio --version)"
+          printf '%s\n' "$version_output"
+          printf '%s\n' "$version_output" | grep -F 'media-studio 0.2.1'
+          timeout 30s flatpak run --command=media-studio io.github.stranmor.MediaStudio profile list >/tmp/media-studio-flatpak-profiles.txt
+          grep -F $'video_mp4\t' /tmp/media-studio-flatpak-profiles.txt
+
+--- END .github/workflows/ci.yml ---
+[bound full-file sha256: 23d360d8656cbc939e16f436e4b978b3e12c003a694aa2499561a6a7baaa9967]
+
+--- BEGIN .github/workflows/gpu.yml (full file) ---
+name: GPU Hardware Smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hardware:
+    name: ${{ matrix.backend }}
+    if: github.repository == 'Stranmor/media-studio' && github.ref == 'refs/heads/main'
+    runs-on: [self-hosted, linux, gpu, '${{ matrix.backend }}']
+    environment: gpu-hardware
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - backend: vaapi
+            vaapi_device: /dev/dri/renderD128
+          - backend: nvenc
+            vaapi_device: ''
+    steps:
+      - uses: actions/checkout@main
+      - name: Verify runner tools
+        run: |
+          set -eu
+          command -v cargo
+          command -v ffmpeg
+          command -v ffprobe
+          command -v systemd-run
+          command -v zenity || command -v kdialog
+      - name: Run real hardware conversion
+        shell: bash
+        run: packaging/gpu/hardware-smoke.sh '${{ matrix.backend }}' '${{ matrix.vaapi_device }}'
+
+--- END .github/workflows/gpu.yml ---
+[bound full-file sha256: 8bcffdce487804467d925a8be54d1a2b6a1203a872b9b43cca75bc36fbcabdd1]
+
+--- BEGIN packaging/gpu/hardware-smoke.sh (full file) ---
+#!/usr/bin/env bash
+set -euo pipefail
+
+backend=${1:?backend is required: vaapi or nvenc}
+vaapi_device=${2:-}
+
+case "$backend" in
+  vaapi)
+    test -n "$vaapi_device"
+    test -c "$vaapi_device"
+    encoder=h264_vaapi
+    profile=video_mp4_vaapi
+    export MEDIA_STUDIO_VAAPI_DEVICE="$vaapi_device"
+    ;;
+  nvenc)
+    encoder=h264_nvenc
+    profile=video_mp4_nvenc
+    ;;
+  *)
+    printf 'unsupported backend: %s\n' "$backend" >&2
+    exit 2
+    ;;
+esac
+
+encoder_listing="$(ffmpeg -hide_banner -encoders 2>/dev/null)"
+for required_encoder in libx264 "$encoder"; do
+  grep -Eq "^[[:space:]]*[A-Z.]{6}[[:space:]]+${required_encoder}([[:space:]]|$)" <<<"$encoder_listing"
+done
+command -v systemd-run >/dev/null
+
+cargo build --release
+
+proof_dir="$(mktemp -d)"
+trap 'rm -rf "$proof_dir"' EXIT
+mkdir -p "$proof_dir/input" "$proof_dir/output" "$proof_dir/home" "$proof_dir/state"
+export HOME="$proof_dir/home"
+export XDG_CONFIG_HOME="$HOME/.config"
+export XDG_STATE_HOME="$proof_dir/state"
+
+ffmpeg -hide_banner -loglevel error \
+  -f lavfi -i testsrc2=size=640x360:rate=24:duration=2 \
+  -f lavfi -i sine=frequency=1000:sample_rate=48000:duration=2 \
+  -shortest -c:v libx264 -c:a aac "$proof_dir/input/fixture.mkv"
+
+target/release/media-studio run \
+  --job-id "gpu-${backend}" \
+  --profile "$profile" \
+  --hardware-fallback=false \
+  --output-dir "$proof_dir/output" \
+  -- "$proof_dir/input/fixture.mkv"
+
+output_file="$(find "$proof_dir/output" -maxdepth 1 -type f -name '*.mp4' -print -quit)"
+test -n "$output_file"
+test -s "$output_file"
+ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1 "$output_file"
+ffmpeg -hide_banner -nostdin -loglevel error -xerror -i "$output_file" \
+  -map 0:v? -map 0:a? -f null -
+
+log_file="$XDG_STATE_HOME/media-studio/jobs/gpu-${backend}.log"
+backend_label="$(printf '%s' "$backend" | tr '[:lower:]' '[:upper:]')"
+grep -Fx "HARDWARE_USED=${backend_label} ENCODER=${encoder}" "$log_file"
+grep -F "$encoder" "$log_file"
+if [ "$backend" = vaapi ]; then
+  grep -F -- "$vaapi_device" "$log_file"
+fi
+if grep -Fq 'HARDWARE_FALLBACK=' "$log_file"; then
+  printf 'hardware fallback was used unexpectedly\n' >&2
+  exit 1
+fi
+grep -Fx 'RESULT=verified' "$log_file"
+
+--- END packaging/gpu/hardware-smoke.sh ---
+[bound full-file sha256: b6e6470cd69687baaa5fbcb2987c8c9a077807a32548c5eb19fb28b77cefb3e8]
+
+--- BEGIN docs/ci/gpu-runners.md (full file) ---
+# GPU CI runners
+
+The GPU workflow is manual by design. It runs only on trusted self-hosted Linux runners and never executes untrusted pull-request code on a private machine.
+
+## Runner labels
+
+Each runner must have the following labels:
+
+- `self-hosted`
+- `linux`
+- `gpu`
+- exactly one backend label: `vaapi` or `nvenc`
+
+Both runners must provide Rust/Cargo, `ffmpeg` with the `libx264` encoder, `ffprobe`, `systemd-run`, and a dialog backend (`zenity` or `kdialog`). The smoke preflight rejects a runner missing any required encoder. The VAAPI runner must expose the character device `/dev/dri/renderD128`, grant the runner user access to it, and provide an FFmpeg build with `h264_vaapi`. The NVENC runner must expose a working NVIDIA driver, `nvidia-smi`, the NVIDIA device nodes (`/dev/nvidia0`, `/dev/nvidiactl`, and `/dev/nvidia-uvm` when present), runner-user access to those nodes, and an FFmpeg build with `h264_nvenc`.
+
+## What the workflow proves
+
+`packaging/gpu/hardware-smoke.sh` creates a real video fixture, invokes the selected Media Studio hardware profile with `--hardware-fallback=false`, verifies the committed MP4 with `ffprobe`, and requires a `RESULT=verified` log without `HARDWARE_FALLBACK`.
+
+The matrix is intentionally separate from the normal CI workflow. If no trusted runner is online, the GPU proof is waiting/unverified; normal build and packaging CI remains independent.
+
+--- END docs/ci/gpu-runners.md ---
+[bound full-file sha256: 583e85d4a3ad9fecbb2c338813c8fb70e836a40a50c74f5be16ad8b414657571]
+
+--- BEGIN packaging/flatpak/io.github.stranmor.MediaStudio.yml (full file) ---
+app-id: io.github.stranmor.MediaStudio
+runtime: org.freedesktop.Platform
+runtime-version: "25.08"
+sdk: org.freedesktop.Sdk
+command: media-studio
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+finish-args:
+  - --share=ipc
+  - --socket=session-bus
+  - --device=dri
+  - --filesystem=home
+  - --filesystem=host
+  - --filesystem=xdg-config/media-studio:create
+  - --filesystem=xdg-config/systemd/user
+  - --filesystem=xdg-data/kio
+  - --talk-name=org.freedesktop.systemd1
+  - --talk-name=org.freedesktop.Flatpak
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+modules:
+  - name: media-studio
+    buildsystem: simple
+    build-options:
+      build-args:
+        - --share=network
+    sources:
+      - type: git
+        url: https://github.com/Stranmor/media-studio.git
+        commit: 63dc708153b76ab7f7527579f103ce24ac106872
+    build-commands:
+      - cargo build --release
+      - install -Dm755 target/release/media-studio /app/bin/media-studio
+      - install -Dm755 packaging/flatpak/host-tool-wrapper /app/bin/media-studio-host-tool
+      - for tool in ffmpeg ffprobe magick systemd-run systemctl kbuildsycoca6 kbuildsycoca5 zenity kdialog; do ln -s media-studio-host-tool /app/bin/$tool; done
+      - install -Dm644 packaging/flatpak/io.github.stranmor.MediaStudio.desktop /app/share/applications/io.github.stranmor.MediaStudio.desktop
+
+--- END packaging/flatpak/io.github.stranmor.MediaStudio.yml ---
+[bound full-file sha256: 102720169cf17784b290599895bee1714afb68108a2e0caa210617e72db053a6]
+
+--- BEGIN packaging/flatpak/io.github.stranmor.MediaStudio.ci.yml (full file) ---
+app-id: io.github.stranmor.MediaStudio
+runtime: org.freedesktop.Platform
+runtime-version: "25.08"
+sdk: org.freedesktop.Sdk
+command: media-studio
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+finish-args:
+  - --share=ipc
+  - --socket=session-bus
+  - --device=dri
+  - --filesystem=home
+  - --filesystem=host
+  - --filesystem=xdg-config/media-studio:create
+  - --filesystem=xdg-config/systemd/user
+  - --filesystem=xdg-data/kio
+  - --talk-name=org.freedesktop.systemd1
+  - --talk-name=org.freedesktop.Flatpak
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+modules:
+  - name: media-studio
+    buildsystem: simple
+    build-options:
+      build-args:
+        - --share=network
+    sources:
+      - type: dir
+        path: ../..
+    build-commands:
+      - cargo build --release
+      - install -Dm755 target/release/media-studio /app/bin/media-studio
+      - install -Dm755 packaging/flatpak/host-tool-wrapper /app/bin/media-studio-host-tool
+      - for tool in ffmpeg ffprobe magick systemd-run systemctl kbuildsycoca6 kbuildsycoca5 zenity kdialog; do ln -s media-studio-host-tool /app/bin/$tool; done
+      - install -Dm644 packaging/flatpak/io.github.stranmor.MediaStudio.desktop /app/share/applications/io.github.stranmor.MediaStudio.desktop
+
+--- END packaging/flatpak/io.github.stranmor.MediaStudio.ci.yml ---
+[bound full-file sha256: 5b57a6aff6f9922000693448c1b985a22261519bc39833fda6a55cba26755b8f]
+
+--- BEGIN src/engine.rs (full file) ---
+use anyhow::{bail, Context, Result};
+use std::fs::{self, File, OpenOptions};
+use std::io::Write;
+use std::os::unix::fs::FileTypeExt;
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+use tempfile::{Builder, NamedTempFile};
+
+use crate::model::{Config, HardwareBackend, Profile};
+use crate::runtime;
+
+pub struct Converted {
+    pub output: PathBuf,
+    pub log: PathBuf,
+}
+
+pub fn convert(
+    config: &Config,
+    profile: &Profile,
+    input: &Path,
+    output: &Path,
+    overwrite: bool,
+    log: &Path,
+) -> Result<Converted> {
+    if !input.is_file() {
+        bail!(
+            "входной объект не является обычным файлом: {}",
+            input.display()
+        );
+    }
+    if let Some(parent) = output.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    if let Some(parent) = log.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let mut log_file = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log)
+        .with_context(|| format!("не удалось открыть лог {}", log.display()))?;
+    let extension = output
+        .extension()
+        .and_then(|value| value.to_str())
+        .unwrap_or("tmp");
+    let temp = Builder::new()
+        .prefix(".media-studio-")
+        .suffix(&format!(".part.{extension}"))
+        .tempfile_in(output.parent().unwrap_or_else(|| Path::new(".")))?;
+    let temp_path = temp.path().to_path_buf();
+    writeln!(log_file, "INPUT={}", input.display())?;
+    writeln!(log_file, "OUTPUT_REQUESTED={}", output.display())?;
+    writeln!(log_file, "ENGINE={}", profile.engine)?;
+
+    let status = match profile.engine.as_str() {
+        "ffmpeg" => run_ffmpeg(config, profile, input, &temp_path, &mut log_file),
+        "magick" => run_magick(profile, input, &temp_path, &mut log_file),
+        other => bail!("неподдерживаемый engine: {other}"),
+    }?;
+    if !status.success() {
+        bail!(
+            "конвертация завершилась с кодом {status}; подробности: {}",
+            log.display()
+        );
+    }
+    if !temp_path.is_file() || fs::metadata(&temp_path)?.len() == 0 {
+        bail!(
+            "движок завершился успешно, но временный результат пуст: {}",
+            temp_path.display()
+        );
+    }
+    if config.verify_results {
+        verify(profile, &temp_path, &mut log_file)?;
+    }
+    let actual_output = persist_output(temp, output, overwrite)?;
+    writeln!(log_file, "OUTPUT_COMMITTED={}", actual_output.display())?;
+    writeln!(
+        log_file,
+        "RESULT={}",
+        if config.verify_results {
+            "verified"
+        } else {
+            "unverified"
+        }
+    )?;
+    Ok(Converted {
+        output: actual_output,
+        log: log.to_path_buf(),
+    })
+}
+
+fn persist_output(temp: NamedTempFile, requested: &Path, overwrite: bool) -> Result<PathBuf> {
+    if overwrite {
+        temp.persist(requested).map_err(|error| {
+            anyhow::anyhow!(
+                "не удалось атомарно заменить {}: {}",
+                requested.display(),
+                error.error
+            )
+        })?;
+        return Ok(requested.to_path_buf());
+    }
+    let mut temp = temp;
+    for index in 0..10_000u32 {
+        let candidate = if index == 0 {
+            requested.to_path_buf()
+        } else {
+            let stem = requested
+                .file_stem()
+                .and_then(|value| value.to_str())
+                .unwrap_or("output");
+            let extension = requested
+                .extension()
+                .and_then(|value| value.to_str())
+                .unwrap_or("bin");
+            requested
+                .parent()
+                .unwrap_or_else(|| Path::new("."))
+                .join(format!("{stem}-{index}.{extension}"))
+        };
+        match temp.persist_noclobber(&candidate) {
+            Ok(_) => return Ok(candidate),
+            Err(error) if error.error.kind() == std::io::ErrorKind::AlreadyExists => {
+                temp = error.file;
+            }
+            Err(error) => {
+                return Err(anyhow::anyhow!(
+                    "не удалось атомарно сохранить {}: {}",
+                    candidate.display(),
+                    error.error
+                ));
+            }
+        }
+    }
+    bail!(
+        "не удалось зарезервировать свободное имя результата рядом с {}",
+        requested.display()
+    )
+}
+
+fn run_ffmpeg(
+    config: &Config,
+    profile: &Profile,
+    input: &Path,
+    temp: &Path,
+    log: &mut File,
+) -> Result<std::process::ExitStatus> {
+    if profile.target_size_mb.is_some() {
+        return run_ffmpeg_target(config, profile, input, temp, log);
+    }
+    run_ffmpeg_once(config, profile, input, temp, log, profile.args.clone())
+}
+
+fn run_ffmpeg_target(
+    config: &Config,
+    profile: &Profile,
+    input: &Path,
+    temp: &Path,
+    log: &mut File,
+) -> Result<std::process::ExitStatus> {
+    let target_mb = profile.target_size_mb.expect("target profile");
+    let duration = probe_duration(input)?;
+    if duration <= 0.0 {
+        bail!("не удалось определить длительность для расчёта целевого размера");
+    }
+    let target_bytes = target_mb.saturating_mul(1_000_000);
+    let audio_kbps = if profile.target_audio_bitrate_kbps == 0 {
+        128
+    } else {
+        profile.target_audio_bitrate_kbps
+    } as f64;
+    let total_kbps = (target_bytes as f64 * 8.0 / duration / 1000.0 * 0.965).max(audio_kbps + 96.0);
+    let mut video_kbps = (total_kbps - audio_kbps - 24.0).max(96.0);
+    let mut last_status = None;
+    for attempt in 1..=5 {
+        let args = target_args(&profile.args, video_kbps, audio_kbps);
+        writeln!(
+            log,
+            "TARGET_ATTEMPT={attempt} TARGET_MB={target_mb} VIDEO_KBPS={video_kbps:.0}"
+        )?;
+        let status = run_ffmpeg_once(config, profile, input, temp, log, args)?;
+        last_status = Some(status);
+        if !status.success() {
+            return Ok(status);
+        }
+        let actual = fs::metadata(temp)
+            .map(|meta| meta.len())
+            .unwrap_or(u64::MAX);
+        if actual <= target_bytes {
+            writeln!(log, "TARGET_RESULT=ok ACTUAL_BYTES={actual}")?;
+            return Ok(status);
+        }
+        let ratio = target_bytes as f64 / actual as f64;
+        video_kbps = (video_kbps * ratio * 0.93).max(64.0);
+    }
+    let actual = fs::metadata(temp).map(|meta| meta.len()).unwrap_or(0);
+    if actual > target_bytes {
+        bail!(
+            "не удалось уложить результат в {target_mb} МБ за 5 проходов (получилось {:.1} МБ)",
+            actual as f64 / 1_000_000.0
+        );
+    }
+    Ok(last_status.expect("target attempts"))
+}
+
+fn run_ffmpeg_once(
+    config: &Config,
+    profile: &Profile,
+    input: &Path,
+    temp: &Path,
+    log: &mut File,
+    args: Vec<String>,
+) -> Result<std::process::ExitStatus> {
+    let selected_args = select_hardware_args(config, profile, &args, log)?;
+    let status = invoke_ffmpeg(config, input, temp, log, &selected_args)?;
+    if status.success() {
+        if let Some(backend) = profile.hardware.as_ref() {
+            if selected_args
+                .iter()
+                .any(|arg| arg == hardware_encoder_name(backend))
+            {
+                writeln!(
+                    log,
+                    "HARDWARE_USED={} ENCODER={}",
+                    backend.label(),
+                    hardware_encoder_name(backend)
+                )?;
+            }
+        }
+    }
+    if status.success()
+        || profile.hardware.is_none()
+        || !config.hardware_fallback
+        || profile.fallback_args.is_empty()
+    {
+        return Ok(status);
+    }
+    writeln!(log, "HARDWARE_FALLBACK=software AFTER_STATUS={status}")?;
+    let fallback_args = if profile.target_size_mb.is_some() {
+        preserve_rate_flags(&profile.fallback_args, &args)
+    } else {
+        profile.fallback_args.clone()
+    };
+    invoke_ffmpeg(config, input, temp, log, &fallback_args)
+}
+
+fn hardware_encoder_name(backend: &HardwareBackend) -> &'static str {
+    match backend {
+        HardwareBackend::Vaapi => "h264_vaapi",
+        HardwareBackend::Nvenc => "h264_nvenc",
+    }
+}
+
+fn select_hardware_args(
+    config: &Config,
+    profile: &Profile,
+    args: &[String],
+    log: &mut File,
+) -> Result<Vec<String>> {
+    let Some(backend) = profile.hardware.as_ref() else {
+        return Ok(args.to_vec());
+    };
+    if let Some(device) = hardware_device(config, backend) {
+        let selected = if matches!(backend, HardwareBackend::Vaapi) {
+            replace_placeholder(args, "{vaapi_device}", &device)
+        } else {
+            args.to_vec()
+        };
+        writeln!(log, "HARDWARE={} selected DEVICE={device}", backend.label())?;
+        return Ok(selected);
+    }
+    if config.hardware_fallback && !profile.fallback_args.is_empty() {
+        writeln!(
+            log,
+            "HARDWARE_FALLBACK=software BACKEND={} REASON=capability_unavailable",
+            backend.label()
+        )?;
+        return Ok(if profile.target_size_mb.is_some() {
+            preserve_rate_flags(&profile.fallback_args, args)
+        } else {
+            profile.fallback_args.clone()
+        });
+    }
+    bail!(
+        "аппаратный профиль {} недоступен: проверьте encoder и устройство; включите hardware_fallback или исправьте конфигурацию",
+        backend.label()
+    )
+}
+
+fn preserve_rate_flags(base: &[String], requested: &[String]) -> Vec<String> {
+    let mut output = base.to_vec();
+    for flag in ["-b:v", "-maxrate", "-bufsize", "-b:a"] {
+        if let Some(index) = requested.iter().position(|arg| arg == flag) {
+            if let Some(value) = requested.get(index + 1) {
+                output.push(flag.to_string());
+                output.push(value.clone());
+            }
+        }
+    }
+    output
+}
+
+fn hardware_device(config: &Config, backend: &HardwareBackend) -> Option<String> {
+    match backend {
+        HardwareBackend::Vaapi => {
+            let device = std::env::var_os("MEDIA_STUDIO_VAAPI_DEVICE")
+                .map(PathBuf::from)
+                .or_else(|| config.vaapi_device.clone().map(PathBuf::from))
+                .or_else(discover_vaapi_device)?;
+            if !is_render_node(&device) || !ffmpeg_encoder_available("h264_vaapi") {
+                return None;
+            }
+            Some(device.display().to_string())
+        }
+        HardwareBackend::Nvenc => {
+            ffmpeg_encoder_available("h264_nvenc").then(|| "nvidia:nvenc".to_string())
+        }
+    }
+}
+
+pub fn hardware_diagnostics(config: &Config) -> Vec<String> {
+    let vaapi_device = std::env::var_os("MEDIA_STUDIO_VAAPI_DEVICE")
+        .map(PathBuf::from)
+        .or_else(|| config.vaapi_device.clone().map(PathBuf::from))
+        .or_else(discover_vaapi_device);
+    let vaapi = match vaapi_device {
+        Some(device) if is_render_node(&device) && ffmpeg_encoder_available("h264_vaapi") => {
+            format!("vaapi: OK ({})", device.display())
+        }
+        Some(device) => format!(
+            "vaapi: MISSING (device or h264_vaapi unavailable: {})",
+            device.display()
+        ),
+        None => "vaapi: MISSING (render node or h264_vaapi unavailable)".to_string(),
+    };
+    let nvenc = if ffmpeg_encoder_available("h264_nvenc") {
+        "nvenc: OK (h264_nvenc)".to_string()
+    } else {
+        "nvenc: MISSING (h264_nvenc unavailable)".to_string()
+    };
+    vec![vaapi, nvenc]
+}
+
+fn discover_vaapi_device() -> Option<PathBuf> {
+    let mut devices = fs::read_dir("/dev/dri")
+        .ok()?
+        .flatten()
+        .map(|entry| entry.path())
+        .filter(|path| {
+            path.file_name()
+                .and_then(|name| name.to_str())
+                .map(|name| name.starts_with("renderD"))
+                .unwrap_or(false)
+        })
+        .filter(|path| is_render_node(path))
+        .collect::<Vec<_>>();
+    devices.sort();
+    devices.into_iter().next()
+}
+
+fn is_render_node(path: &Path) -> bool {
+    let render_name = path
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| name.starts_with("renderD"))
+        .unwrap_or(false);
+    render_name
+        && fs::metadata(path)
+            .map(|meta| meta.file_type().is_char_device())
+            .unwrap_or(false)
+}
+
+fn ffmpeg_encoder_available(encoder: &str) -> bool {
+    let Some(ffmpeg) = runtime::optional("ffmpeg") else {
+        return false;
+    };
+    let Ok(output) = Command::new(ffmpeg)
+        .args(["-hide_banner", "-encoders"])
+        .output()
+    else {
+        return false;
+    };
+    if !output.status.success() {
+        return false;
+    }
+    parse_encoder_listing(&String::from_utf8_lossy(&output.stdout), encoder)
+}
+
+fn parse_encoder_listing(listing: &str, encoder: &str) -> bool {
+    listing
+        .lines()
+        .any(|line| line.split_whitespace().any(|token| token == encoder))
+}
+
+fn replace_placeholder(args: &[String], placeholder: &str, value: &str) -> Vec<String> {
+    args.iter()
+        .map(|arg| {
+            if arg == placeholder {
+                value.to_string()
+            } else {
+                arg.clone()
+            }
+        })
+        .collect()
+}
+
+fn invoke_ffmpeg(
+    config: &Config,
+    input: &Path,
+    temp: &Path,
+    log: &mut File,
+    args: &[String],
+) -> Result<std::process::ExitStatus> {
+    let expanded = expanded_args(args, input, temp);
+    let mut command = Command::new(runtime::required("ffmpeg")?);
+    command
+        .args(["-hide_banner", "-nostdin", "-y", "-loglevel", "error", "-i"])
+        .arg(input)
+        .args([
+            "-filter_threads",
+            "1",
+            "-filter_complex_threads",
+            "1",
+            "-threads",
+        ])
+        .arg(config.ffmpeg_threads.to_string())
+        .args(expanded.iter().map(String::as_str));
+    if !args.iter().any(|arg| arg == "{output}") {
+        command.arg(temp);
+    }
+    writeln!(log, "COMMAND=ffmpeg {:?}", command)?;
+    let log_out = log.try_clone()?;
+    let log_err = log.try_clone()?;
+    Ok(command
+        .stdout(Stdio::from(log_out))
+        .stderr(Stdio::from(log_err))
+        .status()?)
+}
+
+fn target_args(base: &[String], video_kbps: f64, audio_kbps: f64) -> Vec<String> {
+    let mut output = Vec::with_capacity(base.len() + 8);
+    let mut index = 0;
+    while index < base.len() {
+        let arg = &base[index];
+        if matches!(arg.as_str(), "-crf" | "-cq" | "-qp") {
+            index += 2;
+            continue;
+        }
+        if arg == "-b:v" {
+            index += 2;
+            continue;
+        }
+        if arg == "-b:a" {
+            output.push(arg.clone());
+            output.push(format!("{audio_kbps:.0}k"));
+            index += 2;
+            continue;
+        }
+        output.push(arg.clone());
+        index += 1;
+    }
+    output.extend([
+        "-b:v".to_string(),
+        format!("{video_kbps:.0}k"),
+        "-maxrate".to_string(),
+        format!("{video_kbps:.0}k"),
+        "-bufsize".to_string(),
+        format!("{:.0}k", video_kbps * 2.0),
+    ]);
+    output
+}
+
+fn probe_duration(input: &Path) -> Result<f64> {
+    let output = Command::new(runtime::required("ffprobe")?)
+        .args([
+            "-v",
+            "error",
+            "-show_entries",
+            "format=duration",
+            "-of",
+            "default=noprint_wrappers=1:nokey=1",
+        ])
+        .arg(input)
+        .output()
+        .context("не удалось определить длительность через ffprobe")?;
+    if !output.status.success() {
+        bail!("ffprobe не смог определить длительность");
+    }
+    String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .parse::<f64>()
+        .context("ffprobe вернул некорректную длительность")
+}
+
+fn run_magick(
+    profile: &Profile,
+    input: &Path,
+    temp: &Path,
+    log: &mut File,
+) -> Result<std::process::ExitStatus> {
+    let args = expanded_args(&profile.args, input, temp);
+    let mut command = Command::new(runtime::required("magick")?);
+    if !profile.args.iter().any(|arg| arg == "{input}") {
+        command.arg(input);
+    }
+    command.args(args.iter().map(String::as_str));
+    if !profile.args.iter().any(|arg| arg == "{output}") {
+        command.arg(temp);
+    }
+    writeln!(log, "COMMAND=magick {:?}", command)?;
+    let log_out = log.try_clone()?;
+    let log_err = log.try_clone()?;
+    Ok(command
+        .stdout(Stdio::from(log_out))
+        .stderr(Stdio::from(log_err))
+        .status()?)
+}
+
+fn expanded_args(args: &[String], input: &Path, output: &Path) -> Vec<String> {
+    args.iter()
+        .map(|arg| {
+            arg.replace("{input}", &input.to_string_lossy())
+                .replace("{output}", &output.to_string_lossy())
+        })
+        .collect()
+}
+
+fn verify(profile: &Profile, output: &Path, log: &mut File) -> Result<()> {
+    match profile.engine.as_str() {
+        "ffmpeg" => {
+            let probe = Command::new(runtime::required("ffprobe")?)
+                .args([
+                    "-v",
+                    "error",
+                    "-show_entries",
+                    "format=duration,size",
+                    "-of",
+                    "default=noprint_wrappers=1",
+                ])
+                .arg(output)
+                .output()
+                .context("не удалось запустить ffprobe для проверки")?;
+            log.write_all(&probe.stderr)?;
+            if !probe.status.success() || String::from_utf8_lossy(&probe.stdout).trim().is_empty() {
+                bail!("ffprobe не подтвердил результат: {}", output.display());
+            }
+            let decode = Command::new(runtime::required("ffmpeg")?)
+                .args([
+                    "-hide_banner",
+                    "-nostdin",
+                    "-loglevel",
+                    "error",
+                    "-xerror",
+                    "-i",
+                ])
+                .arg(output)
+                .args(["-map", "0:v?", "-map", "0:a?", "-f", "null", "-"])
+                .output()
+                .context("не удалось запустить полную проверку декодирования")?;
+            log.write_all(&decode.stderr)?;
+            if !decode.status.success() {
+                bail!("полное декодирование результата завершилось с ошибкой");
+            }
+        }
+        "magick" => {
+            let check = Command::new(runtime::required("magick")?)
+                .args(["identify", "-quiet"])
+                .arg(output)
+                .output()
+                .context("не удалось проверить результат ImageMagick")?;
+            log.write_all(&check.stderr)?;
+            if !check.status.success() {
+                bail!("ImageMagick не подтвердил результат: {}", output.display());
+            }
+        }
+        _ => bail!("нельзя проверить неизвестный engine"),
+    }
+    Ok(())
+}
+
+pub fn inspect(input: &Path, json: bool) -> Result<String> {
+    if !input.is_file() {
+        bail!(
+            "файл не найден или это не обычный файл: {}",
+            input.display()
+        );
+    }
+    if json {
+        let output = Command::new(runtime::required("ffprobe")?)
+            .args([
+                "-v",
+                "error",
+                "-show_format",
+                "-show_streams",
+                "-of",
+                "json",
+            ])
+            .arg(input)
+            .output()
+            .context("не удалось запустить ffprobe")?;
+        if output.status.success() {
+            return Ok(String::from_utf8_lossy(&output.stdout).into_owned());
+        }
+    }
+    let output = Command::new(runtime::required("ffprobe")?).args(["-v", "error", "-show_entries", "format=filename,format_name,duration,size:stream=index,codec_type,codec_name,width,height,channels,sample_rate", "-of", "default=noprint_wrappers=1"]).arg(input).output().context("не удалось запустить ffprobe")?;
+    if !output.status.success() {
+        let image = Command::new(runtime::required("magick")?)
+            .args(["identify", "-format", "%m %wx%h %[channels]"])
+            .arg(input)
+            .output()?;
+        if image.status.success() {
+            return Ok(String::from_utf8_lossy(&image.stdout).into_owned());
+        }
+        bail!("не удалось определить формат {}", input.display());
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).into_owned())
+}
+
+pub fn ensure_tools(profile: Option<&Profile>) -> Result<()> {
+    let mut tools = vec!["ffmpeg", "ffprobe", "systemd-run"];
+    if profile.map(|item| item.engine == "magick").unwrap_or(true) {
+        tools.push("magick");
+    }
+    if runtime::optional("zenity").is_none() && runtime::optional("kdialog").is_none() {
+        bail!("не найден zenity или kdialog для пользовательских окон");
+    }
+    for tool in tools {
+        if runtime::optional(tool).is_none() {
+            bail!(
+                "не найден обязательный инструмент `{tool}`. Установите пакет и повторите запуск."
+            );
+        }
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn encoder_listing_requires_exact_encoder_token() {
+        let listing = " V..... h264_vaapi           H.264/AVC (VAAPI)\n V..... h264_nvenc           NVIDIA NVENC H.264 encoder";
+        assert!(parse_encoder_listing(listing, "h264_vaapi"));
+        assert!(parse_encoder_listing(listing, "h264_nvenc"));
+        assert!(!parse_encoder_listing(listing, "h264"));
+    }
+
+    #[test]
+    fn placeholder_replacement_is_exact() {
+        let args = vec![
+            "-vaapi_device".to_string(),
+            "{vaapi_device}".to_string(),
+            "{vaapi_device}-suffix".to_string(),
+        ];
+        let replaced = replace_placeholder(&args, "{vaapi_device}", "/dev/dri/renderD129");
+        assert_eq!(replaced[1], "/dev/dri/renderD129");
+        assert_eq!(replaced[2], "{vaapi_device}-suffix");
+    }
+
+    #[test]
+    fn target_fallback_preserves_rate_flags() {
+        let software = vec!["-c:v".to_string(), "libx264".to_string()];
+        let requested = vec![
+            "-c:v".to_string(),
+            "h264_nvenc".to_string(),
+            "-b:v".to_string(),
+            "900k".to_string(),
+            "-maxrate".to_string(),
+            "900k".to_string(),
+            "-bufsize".to_string(),
+            "1800k".to_string(),
+            "-b:a".to_string(),
+            "128k".to_string(),
+        ];
+        let fallback = preserve_rate_flags(&software, &requested);
+        assert!(fallback.windows(2).any(|pair| pair == ["-b:v", "900k"]));
+        assert!(fallback.windows(2).any(|pair| pair == ["-maxrate", "900k"]));
+        assert!(fallback
+            .windows(2)
+            .any(|pair| pair == ["-bufsize", "1800k"]));
+        assert!(fallback.windows(2).any(|pair| pair == ["-b:a", "128k"]));
+    }
+}
+
+--- END src/engine.rs ---
+[bound full-file sha256: 2762d240f707ca9284d5337a8666d64067d899a2fc07976782db3a0c8517959c]
