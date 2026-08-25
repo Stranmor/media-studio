@@ -1,0 +1,24 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  linux-x86_64:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@latest
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release
+      - name: Prepare release assets
+        run: |
+          install -Dm755 target/release/media-studio media-studio-linux-x86_64
+          sha256sum media-studio-linux-x86_64 > media-studio-linux-x86_64.sha256
+      - uses: softprops/action-gh-release@latest
+        with:
+          files: |
+            media-studio-linux-x86_64
+            media-studio-linux-x86_64.sha256

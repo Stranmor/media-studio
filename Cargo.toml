@@ -1,0 +1,22 @@
+[package]
+name = "media-studio"
+version = "0.1.0"
+edition = "2021"
+description = "Dolphin-integrated media conversion studio"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/Stranmor/media-studio"
+keywords = ["dolphin", "kde", "ffmpeg", "media", "converter"]
+categories = ["command-line-utilities", "multimedia"]
+
+[dependencies]
+anyhow = "*"
+clap = { version = "*", features = ["derive"] }
+serde = { version = "*", features = ["derive"] }
+serde_json = "*"
+toml = "*"
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = true

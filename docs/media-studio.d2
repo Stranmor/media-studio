@@ -1,0 +1,63 @@
+direction: right
+
+operator: Пользователь {
+  shape: person
+}
+
+dolphin: Dolphin service menu {
+  label: "Dolphin\nright-click"
+  shape: rectangle
+}
+
+chooser: KDialog profile chooser {
+  label: "Advanced profile"
+  shape: rectangle
+}
+
+queue: user-systemd queue {
+  label: "Transient job\nnon-blocking"
+  shape: rectangle
+}
+
+core: Rust Media Studio {
+  label: "typed orchestration\nprofiles + state + logs"
+  shape: rectangle
+}
+
+config: TOML profiles {
+  label: "~/.config/media-studio/config.toml"
+  shape: cylinder
+}
+
+state: Job state and logs {
+  label: "~/.local/state/media-studio/jobs"
+  shape: cylinder
+}
+
+engines: Media engines {
+  ffmpeg: FFmpeg + ffprobe
+  magick: ImageMagick
+}
+
+consumer: Final consumer proof {
+  label: "atomic output\nprobe / identify\nnotification"
+  shape: hexagon
+}
+
+failure: Recovery boundary {
+  label: "temporary output\nfailed verification\nsource preserved"
+  shape: hexagon
+}
+
+operator -> dolphin: selects files
+dolphin -> chooser: advanced action
+chooser -> queue: selected profile
+dolphin -> queue: quick profile
+queue -> core: run job
+config -> core: load validated profiles
+core -> state: write status and log
+core -> engines: execute typed argv
+engines -> consumer: verified result
+engines -> failure: non-zero or invalid output
+failure -> state: record failed terminal state
+consumer -> state: record completed receipt

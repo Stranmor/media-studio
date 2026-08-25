@@ -1,0 +1,178 @@
+use anyhow::{bail, Context, Result};
+use std::process::{Command, Stdio};
+
+use crate::model::Config;
+
+#[derive(Debug, Clone)]
+pub struct AdvancedSelection {
+    pub profile: String,
+    pub target_size_mb: Option<u64>,
+    pub overwrite: bool,
+    pub hardware_fallback: bool,
+}
+
+pub fn notify(title: &str, body: &str) {
+    let notify_status = Command::new("notify-send")
+        .arg("--app-name=Media Studio")
+        .arg(title)
+        .arg(body)
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+    if notify_status.map(|status| status.success()).unwrap_or(false) {
+        return;
+    }
+    let _ = Command::new("kdialog")
+        .args(["--title", title, "--passivepopup", body, "5"])
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+}
+
+pub fn error(title: &str, body: &str) {
+    eprintln!("{title}: {body}");
+    notify(title, body);
+}
+
+pub fn choose_advanced(config: &Config) -> Result<AdvancedSelection> {
+    if which("zenity").is_some() {
+        return choose_with_zenity(config);
+    }
+    choose_with_kdialog(config)
+}
+
+fn choose_with_zenity(config: &Config) -> Result<AdvancedSelection> {
+    let values = config
+        .profiles
+        .iter()
+        .map(|(id, profile)| format!("{id} — {} / {}", profile.category, profile.label))
+        .collect::<Vec<_>>();
+    let first = values.first().cloned().unwrap_or_else(|| config.default_profile.clone());
+    let profile_values = values.join("|");
+    let output = Command::new("zenity")
+        .args([
+            "--forms",
+            "--title",
+            "Media Studio — расширенные настройки",
+            "--text",
+            "Выберите профиль и параметры задания",
+            "--separator",
+            "|",
+            "--width",
+            "720",
+            "--height",
+            "420",
+            "--add-combo",
+            "Профиль",
+            "--combo-values",
+            &profile_values,
+            "--add-entry",
+            "Целевой размер, МБ (пусто — без ограничения)",
+            "--add-checkbox",
+            "Перезаписывать существующий файл",
+            "--add-checkbox",
+            "Software fallback для VAAPI/NVENC",
+        ])
+        .output()
+        .context("не удалось открыть расширенное окно Zenity")?;
+    if !output.status.success() {
+        bail!("Операция отменена: профиль не выбран.");
+    }
+    let fields = String::from_utf8_lossy(&output.stdout)
+        .trim()
+        .split('|')
+        .map(str::to_string)
+        .collect::<Vec<_>>();
+    let selected = fields.first().cloned().unwrap_or(first);
+    let profile = selected.split(" — ").next().unwrap_or(&selected).to_string();
+    if !config.profiles.contains_key(&profile) {
+        bail!("Диалог вернул неизвестный профиль: {profile}");
+    }
+    let target_size_mb =
+        fields.get(1).and_then(|value| value.trim().parse::<u64>().ok()).filter(|value| *value > 0);
+    let overwrite = fields.get(2).map(|value| value.eq_ignore_ascii_case("true")).unwrap_or(false);
+    let hardware_fallback = fields
+        .get(3)
+        .map(|value| value.eq_ignore_ascii_case("true"))
+        .unwrap_or(config.hardware_fallback);
+    Ok(AdvancedSelection { profile, target_size_mb, overwrite, hardware_fallback })
+}
+
+fn choose_with_kdialog(config: &Config) -> Result<AdvancedSelection> {
+    let mut args = vec![
+        "--title",
+        "Media Studio — расширенные настройки",
+        "--menu",
+        "Выберите профиль конвертации",
+    ];
+    let mut owned = Vec::new();
+    for (id, profile) in &config.profiles {
+        owned.push(id.clone());
+        owned.push(format!("{} — {}", profile.category, profile.label));
+    }
+    for value in &owned {
+        args.push(value);
+    }
+    let output = Command::new("kdialog")
+        .args(args)
+        .output()
+        .context("не удалось открыть диалог выбора профиля")?;
+    if !output.status.success() {
+        bail!("Операция отменена: профиль не выбран.");
+    }
+    let profile = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    if profile.is_empty() || !config.profiles.contains_key(&profile) {
+        bail!("Диалог вернул неизвестный профиль: {profile}");
+    }
+    let target_size_mb = kdialog_inputbox("Целевой размер, МБ (пусто — без ограничения)", "")?
+        .trim()
+        .parse::<u64>()
+        .ok()
+        .filter(|value| *value > 0);
+    let overwrite = kdialog_yesno("Перезаписать существующие результаты?")?;
+    let hardware_fallback = kdialog_yesno("Разрешить software fallback для VAAPI/NVENC?")?;
+    Ok(AdvancedSelection { profile, target_size_mb, overwrite, hardware_fallback })
+}
+
+fn kdialog_inputbox(prompt: &str, initial: &str) -> Result<String> {
+    let output = Command::new("kdialog")
+        .args(["--title", "Media Studio — расширенные настройки", "--inputbox", prompt, initial])
+        .output()
+        .context("не удалось открыть поле ввода KDialog")?;
+    if !output.status.success() {
+        bail!("Операция отменена пользователем.");
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+fn kdialog_yesno(prompt: &str) -> Result<bool> {
+    let status = Command::new("kdialog")
+        .args(["--title", "Media Studio — расширенные настройки", "--yesno", prompt])
+        .status()
+        .context("не удалось открыть подтверждение KDialog")?;
+    if status.code() == Some(1) {
+        return Ok(false);
+    }
+    if status.success() {
+        return Ok(true);
+    }
+    bail!("Операция отменена пользователем.");
+}
+
+pub fn show_info(title: &str, body: &str) {
+    let _ = Command::new("zenity")
+        .args(["--info", "--title", title, "--text", body, "--width", "760"])
+        .status()
+        .or_else(|_| Command::new("kdialog").args(["--title", title, "--msgbox", body]).status());
+}
+
+fn which(name: &str) -> Option<std::path::PathBuf> {
+    let paths = std::env::var_os("PATH")?;
+    for dir in std::env::split_paths(&paths) {
+        let candidate = dir.join(name);
+        if candidate.is_file() {
+            return Some(candidate);
+        }
+    }
+    None
+}
