@@ -12,15 +12,22 @@ optdepends=(
   'zenity: single-window advanced settings'
   'kdialog: KDE fallback advanced settings'
 )
-# Release packages are built from the matching immutable release tag, never
-# from a moving branch. The prepare check rejects an unexpected checkout.
-source=("git+https://github.com/Stranmor/media-studio.git#tag=v$pkgver")
+# Release packages are built from the matching release tag and verify the
+# resolved commit before compiling, never from a moving branch.
+source_repo='https://github.com/Stranmor/media-studio.git'
+source_tag="v$pkgver"
+source_helper="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)/verify-source.sh"
+source_commit="${MEDIA_STUDIO_SOURCE_COMMIT:-}"
+source=("git+$source_repo#tag=$source_tag")
 sha256sums=('SKIP')
 
 prepare() {
   cd "$srcdir/media-studio"
-  expected_tag="v$pkgver"
-  test "$(git describe --tags --exact-match HEAD 2>/dev/null)" = "$expected_tag"
+  if [[ -z "$source_commit" ]]; then
+    source_commit="$($source_helper --resolve --repo "$source_repo" --tag "$source_tag")"
+  fi
+  test "$(git rev-parse HEAD)" = "$source_commit"
+  test "$(git describe --tags --exact-match HEAD 2>/dev/null)" = "$source_tag"
 }
 
 build() {

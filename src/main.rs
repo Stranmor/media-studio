@@ -602,22 +602,24 @@ fn ensure_watch_id(id: &str) -> Result<()> {
 }
 
 fn install_watch_unit(config: &Config, folder: &WatchFolder) -> Result<()> {
+    ensure_watch_id(&folder.id)?;
     let binary = paths::installed_binary_path();
     let path = paths::watch_service_path(&folder.id);
-    if let Some(parent) = path.parent() {
-        fs::create_dir_all(parent)?;
-    }
-    let binary = systemd_quote(&binary);
+    let binary = systemd_quote(&binary)?;
     let vaapi_environment = std::env::var("MEDIA_STUDIO_VAAPI_DEVICE")
         .ok()
         .or_else(|| config.vaapi_device.clone())
         .map(|device| {
-            format!(
-                "Environment=MEDIA_STUDIO_VAAPI_DEVICE={}\n",
-                systemd_quote(Path::new(&device))
-            )
+            let quoted = systemd_quote(Path::new(&device))?;
+            Ok::<_, anyhow::Error>(format!(
+                "Environment=MEDIA_STUDIO_VAAPI_DEVICE={quoted}\n"
+            ))
         })
+        .transpose()?
         .unwrap_or_default();
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
     let unit = format!("[Unit]\nDescription=Media Studio watch-folder {}\nAfter=graphical-session.target\n\n[Service]\n{}ExecStart={} watch-run --id {}\nRestart=always\nRestartSec=4\n\n[Install]\nWantedBy=default.target\n", folder.id, vaapi_environment, binary, folder.id);
     paths::atomic_write(&path, unit.as_bytes())?;
     let reload = required_command("systemctl")?
@@ -637,11 +639,10 @@ fn install_watch_unit(config: &Config, folder: &WatchFolder) -> Result<()> {
 }
 
 fn preflight_install() -> Result<()> {
-    let required = ["ffmpeg", "ffprobe", "systemd-run", "systemctl"];
-    let missing = required
+    let missing = CORE_PREREQUISITES
         .iter()
-        .filter(|tool| find_on_path(tool).is_none())
         .copied()
+        .filter(|tool| find_on_path(tool).is_none())
         .collect::<Vec<_>>();
     if !missing.is_empty() {
         bail!(
@@ -772,7 +773,7 @@ fn doctor() -> Result<()> {
     println!("verify_results: {}", config.verify_results);
     println!("ffmpeg_threads: {}", config.ffmpeg_threads);
     let mut missing_core = Vec::new();
-    for tool in ["ffmpeg", "ffprobe", "systemd-run", "systemctl"] {
+    for &tool in CORE_PREREQUISITES {
         match find_on_path(tool) {
             Some(path) => println!("{tool}: OK ({})", path.display()),
             None => {
@@ -783,18 +784,12 @@ fn doctor() -> Result<()> {
     }
     match kde_cache_builder() {
         Some(path) => println!("kde_cache_builder: OK ({})", path.display()),
-        None => {
-            println!("kde_cache_builder: MISSING (kbuildsycoca6 or kbuildsycoca5)");
-            missing_core.push("kbuildsycoca6|kbuildsycoca5");
-        }
+        None => println!("kde_cache_builder: OPTIONAL-MISSING (kbuildsycoca6 or kbuildsycoca5)"),
     }
     let dialog_backend = find_on_path("zenity").or_else(|| find_on_path("kdialog"));
     match dialog_backend {
         Some(path) => println!("dialog_backend: OK ({})", path.display()),
-        None => {
-            println!("dialog_backend: MISSING (zenity or kdialog)");
-            missing_core.push("zenity|kdialog");
-        }
+        None => println!("dialog_backend: OPTIONAL-MISSING (zenity or kdialog)"),
     }
     for tool in ["magick", "notify-send"] {
         match find_on_path(tool) {
@@ -848,7 +843,7 @@ fn install(force_config: bool) -> Result<()> {
     };
     let menu_paths = paths::service_menu_paths();
     fs::create_dir_all(paths::service_menu_dir())?;
-    for (menu_path, menu) in menu_paths.iter().zip(service_menus(&target)) {
+    for (menu_path, menu) in menu_paths.iter().zip(service_menus(&target)?) {
         fs::write(menu_path, menu)?;
         fs::set_permissions(menu_path, fs::Permissions::from_mode(0o755))?;
     }
@@ -1231,30 +1226,30 @@ const IMAGE_ACTIONS: &[MenuAction] = &[
     },
 ];
 
-fn service_menus(executable: &Path) -> Vec<String> {
-    vec![
+fn service_menus(executable: &Path) -> Result<Vec<String>> {
+    Ok(vec![
         service_menu(
             executable,
             "Media Studio — Video",
             "Видео",
             "video/*;video/ogg;",
             VIDEO_ACTIONS,
-        ),
+        )?,
         service_menu(
             executable,
             "Media Studio — Audio",
             "Аудио",
             "audio/*;application/ogg;application/x-ogg;audio/ogg;audio/opus;audio/x-opus+ogg;",
             AUDIO_ACTIONS,
-        ),
+        )?,
         service_menu(
             executable,
             "Media Studio — Images",
             "Изображения",
             "image/*;",
             IMAGE_ACTIONS,
-        ),
-    ]
+        )?,
+    ])
 }
 
 fn service_menu(
@@ -1263,8 +1258,8 @@ fn service_menu(
     name_ru: &str,
     mime_types: &str,
     actions: &[MenuAction],
-) -> String {
-    let exe = desktop_quote(executable);
+) -> Result<String> {
+    let exe = desktop_quote(executable)?;
     let action_ids = actions
         .iter()
         .map(|action| action.id)
@@ -1279,24 +1274,43 @@ fn service_menu(
             action.id, action.name, action.name_ru, action.icon, exe, action.command
         ));
     }
-    output
+    Ok(output)
 }
 
-fn desktop_quote(path: &Path) -> String {
+fn desktop_quote(path: &Path) -> Result<String> {
     let raw = path
-        .to_string_lossy()
+        .to_str()
+        .context("path used in a Dolphin menu is not valid UTF-8")?
+        .to_string()
         .replace('\\', "\\\\")
-        .replace('"', "\\\"");
-    format!("\"{raw}\"")
+        .replace('"', "\\\"")
+        .replace('%', "%%");
+    ensure_quoted_value(&raw, "Dolphin menu executable")?;
+    Ok(format!("\"{raw}\""))
 }
 
-fn systemd_quote(path: &Path) -> String {
+fn systemd_quote(path: &Path) -> Result<String> {
     let raw = path
-        .to_string_lossy()
+        .to_str()
+        .context("path used in a systemd unit is not valid UTF-8")?
+        .to_string()
         .replace('\\', "\\\\")
-        .replace('"', "\\\"");
-    format!("\"{raw}\"")
+        .replace('"', "\\\"")
+        .replace('%', "%%");
+    ensure_quoted_value(&raw, "systemd unit value")?;
+    Ok(format!("\"{raw}\""))
 }
+
+fn ensure_quoted_value(value: &str, label: &str) -> Result<()> {
+    anyhow::ensure!(!value.is_empty(), "{label} must not be empty");
+    anyhow::ensure!(
+        !value.chars().any(char::is_control),
+        "{label} contains a control character"
+    );
+    Ok(())
+}
+
+const CORE_PREREQUISITES: &[&str] = &["ffmpeg", "ffprobe", "systemd-run", "systemctl"];
 
 fn find_on_path(name: &str) -> Option<PathBuf> {
     runtime::optional(name)
@@ -1334,7 +1348,7 @@ mod tests {
 
     #[test]
     fn menu_quotes_executable() {
-        let menus = service_menus(Path::new("/tmp/media studio"));
+        let menus = service_menus(Path::new("/tmp/media studio")).unwrap();
         assert_eq!(menus.len(), 3);
         assert!(menus[0].contains("Exec=\"/tmp/media studio\" enqueue"));
         assert!(menus[0].contains("MimeType=video/*;"));
@@ -1347,9 +1361,30 @@ mod tests {
     #[test]
     fn watch_unit_quotes_binary_path() {
         assert_eq!(
-            systemd_quote(Path::new("/tmp/media studio/bin")),
+            systemd_quote(Path::new("/tmp/media studio/bin")).unwrap(),
             "\"/tmp/media studio/bin\""
         );
+    }
+
+    #[test]
+    fn generated_values_escape_percent_and_reject_controls() {
+        assert_eq!(
+            systemd_quote(Path::new("/tmp/100%/bin")).unwrap(),
+            "\"/tmp/100%%/bin\""
+        );
+        assert!(systemd_quote(Path::new("/tmp/bad\n/bin")).is_err());
+        assert!(desktop_quote(Path::new("/tmp/bad\r/bin")).is_err());
+    }
+
+    #[test]
+    fn core_prerequisites_exclude_optional_desktop_helpers() {
+        assert_eq!(
+            CORE_PREREQUISITES,
+            &["ffmpeg", "ffprobe", "systemd-run", "systemctl"]
+        );
+        assert!(!CORE_PREREQUISITES.contains(&"kbuildsycoca6"));
+        assert!(!CORE_PREREQUISITES.contains(&"zenity"));
+        assert!(!CORE_PREREQUISITES.contains(&"kdialog"));
     }
 
     #[test]

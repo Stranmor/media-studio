@@ -4,7 +4,10 @@
 
 `packaging/arch/PKGBUILD` builds the `media-studio` package with Arch's Rust
 toolchain. The package installs the binary and documentation; run
-`media-studio install` as the user who owns the Dolphin session.
+`media-studio install` as the user who owns the Dolphin session. The PKGBUILD
+resolves the release tag to a commit before `prepare()` and fails closed on a
+source mismatch; `packaging/arch/verify-source.sh` is the same identity check
+used by release CI.
 
 ## Flatpak profiles
 

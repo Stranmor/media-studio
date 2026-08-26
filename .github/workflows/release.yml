@@ -24,6 +24,10 @@ jobs:
     steps:
       - uses: actions/checkout@main
       - uses: dtolnay/rust-toolchain@stable
+      - name: Verify Arch release source identity
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: packaging/arch/verify-source.sh --repo https://github.com/Stranmor/media-studio.git --tag "${GITHUB_REF_NAME}" --expected-commit "$EXPECTED_SHA"
       - run: cargo build --release
       - name: Build binary and distro packages
         shell: bash

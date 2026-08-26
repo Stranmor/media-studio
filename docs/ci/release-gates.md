@@ -25,6 +25,8 @@ the privileged build container has no desktop Flatpak session helper; the
 published bundle remains explicitly experimental and uses host delegation on a
 real KDE session.
 
-Arch VCS packaging resolves the matching `v$pkgver` release tag and rejects a
-checkout that is not exactly that tag; Debian and RPM metadata declare the
-FFmpeg and systemd runtime prerequisites used by the installer.
+Arch VCS packaging resolves the matching `v$pkgver` release tag to its commit
+and rejects a checkout that is not exactly that tag and commit. The release
+workflow independently verifies that the remote tag resolves to `github.sha`;
+Debian and RPM metadata declare the FFmpeg and systemd runtime prerequisites
+used by the installer.
