@@ -76,6 +76,11 @@ fi
 
 runner_dir=${runner_dir:-"$HOME/.local/share/media-studio/actions-runner-$backend"}
 runner_name=${runner_name:-"media-studio-$backend-$(hostname -s)"}
+runner_user="$(id -un)"
+if [[ "$runner_user" == root || "$(id -u)" -eq 0 ]]; then
+  printf 'run provisioning as the target non-root user so its user service and linger state are owned correctly\n' >&2
+  exit 2
+fi
 [[ "$runner_dir" == /* ]] || {
   printf 'runner directory must be absolute: %s\n' "$runner_dir" >&2
   exit 2
@@ -145,6 +150,25 @@ for tool in bash curl tar sha256sum ffmpeg ffprobe systemd-run systemctl cargo r
     exit 1
   }
 done
+command -v loginctl >/dev/null || {
+  printf 'missing required tool: loginctl (systemd-logind is required for durable user lingering)\n' >&2
+  exit 1
+}
+
+linger_state="$(loginctl show-user "$runner_user" -p Linger --value 2>/dev/null || true)"
+if [[ "$linger_state" != yes ]]; then
+  if ! loginctl enable-linger "$runner_user" >/dev/null 2>&1; then
+    if ! command -v sudo >/dev/null 2>&1 || ! sudo -n loginctl enable-linger "$runner_user" >/dev/null 2>&1; then
+      printf 'user lingering is disabled for %s; enable it with loginctl before provisioning the durable runner service\n' "$runner_user" >&2
+      exit 1
+    fi
+  fi
+  linger_state="$(loginctl show-user "$runner_user" -p Linger --value 2>/dev/null || true)"
+fi
+if [[ "$linger_state" != yes ]]; then
+  printf 'loginctl did not confirm lingering for %s; refusing a non-durable runner service\n' "$runner_user" >&2
+  exit 1
+fi
 
 encoder_listing="$(ffmpeg -hide_banner -encoders 2>/dev/null)"
 grep -Eq '^[[:space:]]*[A-Z.]{6}[[:space:]]+libx264([[:space:]]|$)' <<<"$encoder_listing"
@@ -410,6 +434,6 @@ hardware_detail=""
 if [[ "$backend" = nvenc ]]; then
   hardware_detail="$(nvidia-smi --query-gpu=name --format=csv,noheader | sed -n '1p')"
 fi
-printf 'schema_version=1\nrepo=%s\nrunner_name=%s\nbackend=%s\nrunner_version=%s\narchive_sha256=%s\nhost=%s\nkernel=%s\nhardware=%s\nservice=%s\nlabels=self-hosted,linux,gpu,%s\n' \
-  "$repo" "$runner_name" "$backend" "$runner_version" "$actual_digest" "$(hostname)" "$(uname -sr)" "$hardware_detail" "$unit_name" "$backend" > "$receipt_path"
+printf 'schema_version=1\nrepo=%s\nrunner_name=%s\nbackend=%s\nrunner_version=%s\narchive_sha256=%s\nhost=%s\nkernel=%s\nhardware=%s\nservice=%s\nuser=%s\nlinger=%s\nlabels=self-hosted,linux,gpu,%s\n' \
+  "$repo" "$runner_name" "$backend" "$runner_version" "$actual_digest" "$(hostname)" "$(uname -sr)" "$hardware_detail" "$unit_name" "$runner_user" "$linger_state" "$backend" > "$receipt_path"
 printf 'runner configured and active: %s (%s)\n' "$runner_name" "$backend"

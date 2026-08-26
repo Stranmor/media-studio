@@ -52,6 +52,10 @@ jobs:
     needs: [build, native-ci, flatpak, hardware]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@main
+        with:
+          ref: ${{ github.ref }}
+          persist-credentials: false
       - uses: actions/download-artifact@main
         with:
           path: release-assets

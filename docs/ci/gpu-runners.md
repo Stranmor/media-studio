@@ -24,9 +24,11 @@ non-interactive hardware smoke.
 
 `packaging/gpu/provision-runner.sh` downloads the current Actions runner,
 registers it with a one-time repository token read from stdin, validates the
-selected hardware, and installs a bounded user-systemd service. Generate the
-token with an authorized GitHub client and never place it in a file or command
-line history:
+selected hardware, verifies `loginctl` lingering for the target user, and
+installs a bounded user-systemd service. If lingering is disabled, provisioning
+tries a non-interactive `loginctl`/`sudo` enablement and fails closed when it
+cannot confirm `Linger=yes`. Generate the token with an authorized GitHub
+client and never place it in a file or command-line history:
 
 ```bash
 gh api -X POST repos/Stranmor/media-studio/actions/runners/registration-token --jq .token \
@@ -37,8 +39,9 @@ Run the same command with `--backend nvenc` on the NVIDIA host. If the system
 volume is small, put the runner work tree on a mounted data volume, for example
 `--runner-dir /mnt/data/media-studio/actions-runner-nvenc`; the generated user
 unit adds `RequiresMountsFor=/mnt/data` for that layout. The script
-keeps the runner directory, service name, labels, hardware identity, and
-runner version in `runner-receipt.txt`; the registration token is not stored.
+keeps the runner directory, service name, labels, hardware identity, runner
+version, and `linger=yes` readback in `runner-receipt.txt`; the registration
+token is not stored.
 
 ## What the workflow proves
 
