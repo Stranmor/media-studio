@@ -114,7 +114,7 @@ jobs:
           printf '%s\n' "$version_output"
           printf '%s\n' "$version_output" | grep -F 'media-studio 0.2.1'
           if [ "$KIND" = host-integration ]; then
-            tool_contract="$(dbus-run-session -- timeout 30s flatpak run --command=sh "$APP_ID" -c 'set -eu; command -v ffmpeg; command -v ffprobe; ffmpeg -hide_banner -encoders')"
+            tool_contract="$(timeout 30s flatpak run --env=MEDIA_STUDIO_HOST_TOOL_MODE=runtime --command=sh "$APP_ID" -c 'set -eu; command -v ffmpeg; command -v ffprobe; ffmpeg -hide_banner -encoders')"
           else
             tool_contract="$(timeout 30s flatpak run --command=sh "$APP_ID" -c 'set -eu; command -v ffmpeg; command -v ffprobe; ffmpeg -hide_banner -encoders')"
           fi
@@ -125,6 +125,9 @@ jobs:
           timeout 30s flatpak run --command=media-studio "$APP_ID" profile list >"/tmp/media-studio-flatpak-profiles-${KIND}.txt"
           grep -F $'video_mp4\t' "/tmp/media-studio-flatpak-profiles-${KIND}.txt"
           proof_dir="$HOME/Downloads/media-studio-flatpak-${GITHUB_RUN_ID}-${KIND}"
+          if [ "$KIND" = host-integration ]; then
+            export MEDIA_STUDIO_FLATPAK_HOST_SMOKE_MODE=runtime
+          fi
           packaging/flatpak/conversion-smoke.sh "$APP_ID" "$proof_dir"
           mkdir -p "flatpak-proof/$KIND"
           cp "$proof_dir/receipt.txt" "$proof_dir/job.log" "$proof_dir/output.mp4" "$proof_dir/output.sha256" "flatpak-proof/$KIND/"

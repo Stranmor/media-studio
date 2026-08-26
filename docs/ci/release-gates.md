@@ -17,3 +17,8 @@ The release publish job downloads every gate receipt and runs
 `packaging/release/verify-gates.sh` before creating the GitHub release. Missing
 native checksums, Flatpak receipts, hardware markers, or verified-result logs
 fail the publish job.
+
+The hosted host-integration smoke records `tool_mode=runtime-fallback` because
+the privileged build container has no desktop Flatpak session helper; the
+published bundle remains explicitly experimental and uses host delegation on a
+real KDE session.

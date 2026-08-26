@@ -2,6 +2,22 @@
 set -eu
 
 tool=${0##*/}
+host_tool_mode=${MEDIA_STUDIO_HOST_TOOL_MODE:-host}
+if [ "$host_tool_mode" = runtime ]; then
+    case "$tool" in
+        ffmpeg|ffprobe)
+            exec "/usr/bin/$tool" "$@"
+            ;;
+        *)
+            printf '%s\n' "Media Studio runtime fallback does not provide host tool: $tool" >&2
+            exit 127
+            ;;
+    esac
+fi
+if [ "$host_tool_mode" != host ]; then
+    printf '%s\n' "unsupported Media Studio host tool mode: $host_tool_mode" >&2
+    exit 2
+fi
 flatpak_spawn=$(command -v flatpak-spawn || true)
 if [ -z "$flatpak_spawn" ]; then
     printf '%s\n' "Media Studio Flatpak requires flatpak-spawn for host tool integration" >&2

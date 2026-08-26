@@ -32,6 +32,11 @@ flatpak-builder --force-clean build-dir packaging/flatpak/io.github.stranmor.Med
 installed bundle, verifies the output with FFprobe and full decode, and checks
 the Media Studio `RESULT=verified` job marker.
 
+Hosted CI runs the experimental host-integration bundle with an explicit
+`runtime-fallback` smoke mode because a GitHub container has no desktop
+Flatpak session helper; normal desktop launches keep the default host-tool
+delegation through `flatpak-spawn --host`.
+
 ## GPU runners
 
 Use `packaging/gpu/provision-runner.sh` to register one dedicated VAAPI or

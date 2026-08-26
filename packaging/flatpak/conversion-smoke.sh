@@ -10,12 +10,25 @@ if [[ ! "$app_id" =~ ^[A-Za-z0-9.-]+$ ]]; then
 fi
 
 host_integration=0
+host_tool_mode="sandbox"
 if [[ "$app_id" == *.HostIntegration ]]; then
   host_integration=1
-  command -v dbus-run-session >/dev/null 2>&1 || {
-    printf 'host integration smoke requires dbus-run-session\n' >&2
-    exit 2
-  }
+  host_tool_mode="host"
+  case "${MEDIA_STUDIO_FLATPAK_HOST_SMOKE_MODE:-host}" in
+    host)
+      command -v dbus-run-session >/dev/null 2>&1 || {
+        printf 'host integration smoke requires dbus-run-session\n' >&2
+        exit 2
+      }
+      ;;
+    runtime)
+      host_tool_mode="runtime-fallback"
+      ;;
+    *)
+      printf 'unsupported host smoke mode: %s\n' "${MEDIA_STUDIO_FLATPAK_HOST_SMOKE_MODE}" >&2
+      exit 2
+      ;;
+  esac
 fi
 
 created_proof=0
@@ -50,8 +63,10 @@ input_file="$input_dir/fixture.mkv"
 job_id="flatpak-${app_id//./-}-${GITHUB_RUN_ID:-local}"
 
 flatpak_cmd() {
-  if (( host_integration )); then
+  if (( host_integration )) && [[ "$host_tool_mode" == host ]]; then
     timeout 180s dbus-run-session -- flatpak run --command="$1" "$app_id" "${@:2}"
+  elif (( host_integration )); then
+    timeout 180s flatpak run --env=MEDIA_STUDIO_HOST_TOOL_MODE=runtime --command="$1" "$app_id" "${@:2}"
   else
     timeout 180s flatpak run --command="$1" "$app_id" "${@:2}"
   fi
@@ -62,9 +77,8 @@ if (( host_integration )); then
   output_arg="$output_dir"
   probe_root="$output_dir"
 else
-  sandbox_home="$(flatpak_cmd sh -c 'printf %s "$HOME"')"
-  sandbox_root="$sandbox_home/Downloads/$(basename "$proof_dir")"
-  flatpak_cmd sh -c 'mkdir -p "$1/input" "$1/output"' sh "$sandbox_root"
+  sandbox_root="/tmp/media-studio-flatpak-$(basename "$proof_dir")"
+  flatpak_cmd sh -c 'test ! -e "$1"; mkdir -p "$1/input" "$1/output"' sh "$sandbox_root"
   input_arg="$sandbox_root/input/fixture.mkv"
   output_arg="$sandbox_root/output"
   probe_root="$sandbox_root/output"
@@ -121,6 +135,6 @@ grep -Fx 'RESULT=verified' "$proof_dir/job.log"
 
 cp "$output_file" "$proof_dir/output.mp4"
 sha256sum "$proof_dir/output.mp4" | sed 's#  .*#  output.mp4#' > "$proof_dir/output.sha256"
-printf 'schema_version=1\napp_id=%s\njob_id=%s\nresult=verified\nduration_seconds=%s\noutput=%s\n' \
-  "$app_id" "$job_id" "$duration" "$output_file" > "$proof_dir/receipt.txt"
+printf 'schema_version=1\napp_id=%s\njob_id=%s\ntool_mode=%s\nresult=verified\nduration_seconds=%s\noutput=%s\n' \
+  "$app_id" "$job_id" "$host_tool_mode" "$duration" "$output_file" > "$proof_dir/receipt.txt"
 printf 'Flatpak conversion verified: %s (%ss)\n' "$app_id" "$duration"

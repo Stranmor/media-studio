@@ -66,6 +66,11 @@ for kind in sandbox host-integration; do
   (cd "$gates_dir/flatpak-$kind" && sha256sum -c output.sha256)
   grep -Fx 'result=verified' "$receipt"
   grep -Fx 'RESULT=verified' "$job_log"
+  if [ "$kind" = sandbox ]; then
+    grep -Fx 'tool_mode=sandbox' "$receipt"
+  else
+    grep -Fx 'tool_mode=runtime-fallback' "$receipt"
+  fi
 done
 
 printf 'release_gate=verified\nnative_arches=x86_64,aarch64\nflatpak_profiles=sandbox,host-integration\nhardware_backends=vaapi,nvenc\n' \
