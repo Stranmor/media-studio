@@ -611,9 +611,7 @@ fn install_watch_unit(config: &Config, folder: &WatchFolder) -> Result<()> {
         .or_else(|| config.vaapi_device.clone())
         .map(|device| {
             let quoted = systemd_quote(Path::new(&device))?;
-            Ok::<_, anyhow::Error>(format!(
-                "Environment=MEDIA_STUDIO_VAAPI_DEVICE={quoted}\n"
-            ))
+            Ok::<_, anyhow::Error>(format!("Environment=MEDIA_STUDIO_VAAPI_DEVICE={quoted}\n"))
         })
         .transpose()?
         .unwrap_or_default();
