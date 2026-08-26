@@ -41,6 +41,19 @@ if kind == "sandbox"
   abort "sandbox must expose runtime ffprobe" unless commands.include?("ln -srv /usr/bin/ffprobe /app/bin/ffprobe")
   abort "sandbox desktop must be explicitly sandboxed" unless File.read("packaging/flatpak/io.github.stranmor.MediaStudio.desktop").include?("Media Studio Sandbox")
 else
+  expected_finish_args = [
+    "--share=ipc",
+    "--socket=session-bus",
+    "--device=dri",
+    "--filesystem=home",
+    "--filesystem=host",
+    "--filesystem=xdg-config/media-studio:create",
+    "--filesystem=xdg-config/systemd/user",
+    "--filesystem=xdg-data/kio",
+    "--talk-name=org.freedesktop.systemd1",
+    "--talk-name=org.freedesktop.Flatpak"
+  ].sort
+  abort "host integration finish-args contract drifted" unless canonical.fetch("finish-args").sort == expected_finish_args
   commands = canonical.dig("modules", 0, "build-commands") || []
   abort "host integration wrapper contract missing" unless commands.any? { |line| line.include?("media-studio-host-tool") }
   abort "host integration must expose KIO data" unless canonical.fetch("finish-args").include?("--filesystem=xdg-data/kio")

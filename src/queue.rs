@@ -1,4 +1,5 @@
 use anyhow::{bail, Context, Result};
+use std::env;
 use std::path::Path;
 use std::process::{Command, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -37,6 +38,7 @@ pub fn enqueue(request: EnqueueRequest<'_>) -> Result<String> {
             "--no-block",
             "--quiet",
         ])
+        .args(inherited_environment_args())
         .args(vaapi_environment_arg(request.vaapi_device))
         .arg(request.executable)
         .args([
@@ -159,6 +161,13 @@ fn vaapi_environment_arg(device: Option<&str>) -> Option<String> {
     device.map(|device| format!("--setenv=MEDIA_STUDIO_VAAPI_DEVICE={device}"))
 }
 
+fn inherited_environment_args() -> Vec<String> {
+    ["HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME"]
+        .into_iter()
+        .filter_map(|key| env::var(key).ok().map(|value| format!("--setenv={key}={value}")))
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     #[test]
@@ -176,5 +185,15 @@ mod tests {
             Some("--setenv=MEDIA_STUDIO_VAAPI_DEVICE=/dev/dri/renderD128".to_string())
         );
         assert_eq!(super::vaapi_environment_arg(None), None);
+    }
+
+    #[test]
+    fn queue_propagates_user_data_environment_keys() {
+        let args = super::inherited_environment_args();
+        for key in ["HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME"] {
+            if std::env::var_os(key).is_some() {
+                assert!(args.iter().any(|arg| arg.starts_with(&format!("--setenv={key}="))));
+            }
+        }
     }
 }

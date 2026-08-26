@@ -98,6 +98,28 @@ case "$runner_dir" in
     exit 2
     ;;
 esac
+
+validate_path_components() {
+  local path="$1"
+  local label="$2"
+  local current="/"
+  local components component
+  IFS='/' read -r -a components <<< "${path#/}"
+  for component in "${components[@]}"; do
+    [[ -z "$component" ]] && continue
+    if [[ "$component" == "." || "$component" == ".." ]]; then
+      printf 'refusing traversal in %s: %s\n' "$label" "$path" >&2
+      exit 2
+    fi
+    current="${current%/}/$component"
+    if [[ -L "$current" ]]; then
+      printf 'refusing a symlinked path component in %s: %s\n' "$label" "$current" >&2
+      exit 2
+    fi
+  done
+}
+
+validate_path_components "$runner_dir" "runner directory"
 if [[ -L "$runner_dir" ]]; then
   printf 'refusing a symlinked runner directory: %s\n' "$runner_dir" >&2
   exit 2
@@ -328,6 +350,7 @@ runner_path="$(dirname "$cc_bin"):$runner_path"
 unit_dir="$HOME/.config/systemd/user"
 unit_name="media-studio-actions-runner-$backend.service"
 unit_path="$unit_dir/$unit_name"
+validate_path_components "$unit_dir" "systemd unit directory"
 mkdir -p "$unit_dir"
 if [[ -L "$unit_path" ]]; then
   printf 'refusing a symlinked systemd unit path: %s\n' "$unit_path" >&2
@@ -379,6 +402,10 @@ systemctl --user enable --now "$unit_name"
 systemctl --user is-active --quiet "$unit_name"
 
 receipt_path="$runner_dir/runner-receipt.txt"
+if [[ -L "$receipt_path" ]]; then
+  printf 'refusing a symlinked runner receipt path: %s\n' "$receipt_path" >&2
+  exit 2
+fi
 hardware_detail=""
 if [[ "$backend" = nvenc ]]; then
   hardware_detail="$(nvidia-smi --query-gpu=name --format=csv,noheader | sed -n '1p')"
