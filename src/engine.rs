@@ -617,12 +617,9 @@ pub fn inspect(input: &Path, json: bool) -> Result<String> {
 }
 
 pub fn ensure_tools(profile: Option<&Profile>) -> Result<()> {
-    let mut tools = vec!["ffmpeg", "ffprobe", "systemd-run"];
-    if profile.map(|item| item.engine == "magick").unwrap_or(true) {
+    let mut tools = vec!["ffmpeg", "ffprobe"];
+    if profile.map(|item| item.engine == "magick").unwrap_or(false) {
         tools.push("magick");
-    }
-    if runtime::optional("zenity").is_none() && runtime::optional("kdialog").is_none() {
-        bail!("не найден zenity или kdialog для пользовательских окон");
     }
     for tool in tools {
         if runtime::optional(tool).is_none() {
@@ -630,6 +627,16 @@ pub fn ensure_tools(profile: Option<&Profile>) -> Result<()> {
                 "не найден обязательный инструмент `{tool}`. Установите пакет и повторите запуск."
             );
         }
+    }
+    Ok(())
+}
+
+pub fn ensure_queue_tools(profile: Option<&Profile>) -> Result<()> {
+    ensure_tools(profile)?;
+    if runtime::optional("systemd-run").is_none() {
+        bail!(
+            "не найден обязательный инструмент `systemd-run`. Установите systemd и повторите запуск."
+        );
     }
     Ok(())
 }

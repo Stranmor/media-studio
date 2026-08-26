@@ -1,8 +1,8 @@
 [Desktop Entry]
 Type=Application
-Name=Media Studio Doctor
-Comment=Проверка локальной интеграции Media Studio
-Exec=media-studio doctor
+Name=Media Studio Sandbox
+Comment=Standalone sandboxed media conversion
+Exec=media-studio --version
 Terminal=true
 NoDisplay=true
 Categories=AudioVideo;Utility;

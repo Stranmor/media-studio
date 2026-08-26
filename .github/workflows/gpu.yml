@@ -2,6 +2,13 @@ name: GPU Hardware Smoke
 
 on:
   workflow_dispatch:
+  workflow_call:
+    inputs:
+      checkout_ref:
+        description: Git ref to test
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -9,7 +16,10 @@ permissions:
 jobs:
   hardware:
     name: ${{ matrix.backend }}
-    if: github.repository == 'Stranmor/media-studio' && github.ref == 'refs/heads/main'
+    if: >-
+      github.repository == 'Stranmor/media-studio' &&
+      ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
+      (github.event_name == 'workflow_call' && inputs.checkout_ref != ''))
     runs-on: [self-hosted, linux, gpu, '${{ matrix.backend }}']
     environment: gpu-hardware
     timeout-minutes: 30
@@ -23,14 +33,31 @@ jobs:
             vaapi_device: ''
     steps:
       - uses: actions/checkout@main
+        with:
+          ref: ${{ inputs.checkout_ref || github.ref }}
       - name: Verify runner tools
         run: |
           set -eu
           command -v cargo
+          command -v rustc
           command -v ffmpeg
           command -v ffprobe
           command -v systemd-run
-          command -v zenity || command -v kdialog
+          cargo --version
+          rustc --version
       - name: Run real hardware conversion
         shell: bash
-        run: packaging/gpu/hardware-smoke.sh '${{ matrix.backend }}' '${{ matrix.vaapi_device }}'
+        env:
+          MEDIA_STUDIO_PROOF_DIR: ${{ runner.temp }}/media-studio-${{ matrix.backend }}
+          CARGO_BUILD_JOBS: 2
+        run: |
+          set -eu
+          mkdir -p "$MEDIA_STUDIO_PROOF_DIR"
+          packaging/gpu/hardware-smoke.sh '${{ matrix.backend }}' '${{ matrix.vaapi_device }}'
+      - name: Upload hardware receipt
+        if: success()
+        uses: actions/upload-artifact@main
+        with:
+          name: media-studio-hardware-${{ matrix.backend }}
+          path: ${{ runner.temp }}/media-studio-${{ matrix.backend }}
+          if-no-files-found: error

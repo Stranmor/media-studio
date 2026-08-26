@@ -7,6 +7,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: media-studio-release-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build:
     strategy:
@@ -45,13 +49,78 @@ jobs:
           path: release-assets/*
 
   publish:
-    needs: build
+    needs: [build, flatpak, hardware]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/download-artifact@main
         with:
           path: release-assets
+          pattern: media-studio-x86_64
           merge-multiple: true
+      - uses: actions/download-artifact@main
+        with:
+          path: release-assets
+          pattern: media-studio-aarch64
+          merge-multiple: true
+      - uses: actions/download-artifact@main
+        with:
+          path: release-assets
+          pattern: media-studio-flatpak-sandbox
+          merge-multiple: true
+      - uses: actions/download-artifact@main
+        with:
+          path: release-assets
+          pattern: media-studio-flatpak-host-integration
+          merge-multiple: true
+      - uses: actions/download-artifact@main
+        with:
+          path: release-gates/hardware-vaapi
+          pattern: media-studio-hardware-vaapi
+          merge-multiple: true
+      - uses: actions/download-artifact@main
+        with:
+          path: release-gates/hardware-nvenc
+          pattern: media-studio-hardware-nvenc
+          merge-multiple: true
+      - uses: actions/download-artifact@main
+        with:
+          path: release-gates/flatpak-sandbox
+          pattern: media-studio-flatpak-smoke-sandbox-*
+          merge-multiple: true
+      - uses: actions/download-artifact@main
+        with:
+          path: release-gates/flatpak-host-integration
+          pattern: media-studio-flatpak-smoke-host-integration-*
+          merge-multiple: true
+      - name: Verify every release gate receipt
+        shell: bash
+        run: packaging/release/verify-gates.sh release-assets release-gates
+      - name: Record release gate receipt
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf 'schema_version=1\nflatpak_gate=verified\nhardware_gate=verified\nref=%s\n' \
+            '${{ github.ref }}' > release-assets/release-gates.txt
       - uses: softprops/action-gh-release@master
         with:
-          files: release-assets/*
+          files: |
+            release-assets/media-studio-linux-*
+            release-assets/*.deb
+            release-assets/*.rpm
+            release-assets/*.flatpak
+            release-assets/release-gates.txt
+
+  flatpak:
+    needs: build
+    uses: ./.github/workflows/flatpak.yml
+    with:
+      checkout_ref: ${{ github.ref }}
+      publish_bundle: true
+    secrets: inherit
+
+  hardware:
+    needs: build
+    uses: ./.github/workflows/gpu.yml
+    with:
+      checkout_ref: ${{ github.ref }}
+    secrets: inherit

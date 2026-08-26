@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Media Studio Host Integration Doctor
+Comment=Check host integration for Media Studio
+Exec=media-studio doctor
+Terminal=true
+NoDisplay=true
+Categories=AudioVideo;Utility;

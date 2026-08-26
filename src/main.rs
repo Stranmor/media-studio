@@ -261,7 +261,7 @@ fn enqueue_with_profile(
     if target_size_mb.is_some() {
         selected_profile.target_size_mb = target_size_mb;
     }
-    engine::ensure_tools(Some(&selected_profile))?;
+    engine::ensure_queue_tools(Some(&selected_profile))?;
     let executable = paths::installed_binary_path();
     let executable = if executable.is_file() {
         executable

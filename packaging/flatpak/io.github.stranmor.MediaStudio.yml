@@ -1,3 +1,7 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/flatpak/flatpak-builder/main/data/flatpak-manifest.schema.json
+
+# Strict standalone sandbox. Dolphin host integration is intentionally kept in
+# io.github.stranmor.MediaStudio.HostIntegration.yml.
 app-id: io.github.stranmor.MediaStudio
 runtime: org.freedesktop.Platform
 runtime-version: "25.08"
@@ -5,17 +9,22 @@ sdk: org.freedesktop.Sdk
 command: media-studio
 sdk-extensions:
   - org.freedesktop.Sdk.Extension.rust-stable
+add-extensions:
+  org.freedesktop.Platform.codecs-extra:
+    directory: lib/codecs-extra
+    version: "25.08-extra"
+    add-ld-path: lib
 finish-args:
   - --share=ipc
-  - --socket=session-bus
+  - --socket=wayland
+  - --socket=fallback-x11
   - --device=dri
-  - --filesystem=home
-  - --filesystem=host
   - --filesystem=xdg-config/media-studio:create
-  - --filesystem=xdg-config/systemd/user
-  - --filesystem=xdg-data/kio
-  - --talk-name=org.freedesktop.systemd1
-  - --talk-name=org.freedesktop.Flatpak
+  - --filesystem=xdg-download
+  - --filesystem=xdg-documents
+  - --filesystem=xdg-music
+  - --filesystem=xdg-pictures
+  - --filesystem=xdg-videos
 build-options:
   append-path: /usr/lib/sdk/rust-stable/bin
 modules:
@@ -27,10 +36,8 @@ modules:
     sources:
       - type: git
         url: https://github.com/Stranmor/media-studio.git
-        commit: 63dc708153b76ab7f7527579f103ce24ac106872
+        branch: main
     build-commands:
       - cargo build --release
       - install -Dm755 target/release/media-studio /app/bin/media-studio
-      - install -Dm755 packaging/flatpak/host-tool-wrapper /app/bin/media-studio-host-tool
-      - for tool in ffmpeg ffprobe magick systemd-run systemctl kbuildsycoca6 kbuildsycoca5 zenity kdialog; do ln -s media-studio-host-tool /app/bin/$tool; done
       - install -Dm644 packaging/flatpak/io.github.stranmor.MediaStudio.desktop /app/share/applications/io.github.stranmor.MediaStudio.desktop

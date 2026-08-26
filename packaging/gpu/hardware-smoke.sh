@@ -15,6 +15,8 @@ case "$backend" in
   nvenc)
     encoder=h264_nvenc
     profile=video_mp4_nvenc
+    command -v nvidia-smi >/dev/null
+    nvidia-smi -L
     ;;
   *)
     printf 'unsupported backend: %s\n' "$backend" >&2
@@ -27,11 +29,34 @@ for required_encoder in libx264 "$encoder"; do
   grep -Eq "^[[:space:]]*[A-Z.]{6}[[:space:]]+${required_encoder}([[:space:]]|$)" <<<"$encoder_listing"
 done
 command -v systemd-run >/dev/null
+command -v sha256sum >/dev/null
 
 cargo build --release
 
-proof_dir="$(mktemp -d)"
-trap 'rm -rf "$proof_dir"' EXIT
+proof_dir="${MEDIA_STUDIO_PROOF_DIR:-}"
+owns_proof=0
+if [[ -z "$proof_dir" ]]; then
+  proof_dir="$(mktemp -d)"
+  owns_proof=1
+else
+  case "$proof_dir" in
+    /|"$HOME"|"$HOME/"|.)
+      printf 'refusing an unsafe proof directory: %s\n' "$proof_dir" >&2
+      exit 2
+      ;;
+  esac
+  mkdir -p "$proof_dir"
+  if find "$proof_dir" -mindepth 1 -maxdepth 1 -print -quit | grep -q .; then
+    printf 'proof directory must be empty: %s\n' "$proof_dir" >&2
+    exit 2
+  fi
+fi
+cleanup() {
+  if (( owns_proof )); then
+    rm -rf -- "$proof_dir"
+  fi
+}
+trap cleanup EXIT
 mkdir -p "$proof_dir/input" "$proof_dir/output" "$proof_dir/home" "$proof_dir/state"
 export HOME="$proof_dir/home"
 export XDG_CONFIG_HOME="$HOME/.config"
@@ -52,7 +77,8 @@ target/release/media-studio run \
 output_file="$(find "$proof_dir/output" -maxdepth 1 -type f -name '*.mp4' -print -quit)"
 test -n "$output_file"
 test -s "$output_file"
-ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1 "$output_file"
+duration="$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$output_file")"
+awk -v duration="$duration" 'BEGIN { exit !(duration > 0) }'
 ffmpeg -hide_banner -nostdin -loglevel error -xerror -i "$output_file" \
   -map 0:v? -map 0:a? -f null -
 
@@ -68,3 +94,14 @@ if grep -Fq 'HARDWARE_FALLBACK=' "$log_file"; then
   exit 1
 fi
 grep -Fx 'RESULT=verified' "$log_file"
+
+ffmpeg_version="$(ffmpeg -version | sed -n '1p')"
+gpu_detail=""
+if [[ "$backend" = nvenc ]]; then
+  gpu_detail="$(nvidia-smi --query-gpu=name --format=csv,noheader | sed -n '1p')"
+fi
+sha256sum "$output_file" | sed 's#  .*#  output.mp4#' > "$proof_dir/output.sha256"
+cp "$log_file" "$proof_dir/job.log"
+printf 'schema_version=1\nbackend=%s\nencoder=%s\nvaapi_device=%s\nhardware_detail=%s\nrunner=%s\nkernel=%s\nffmpeg=%s\nduration_seconds=%s\nresult=verified\n' \
+  "$backend" "$encoder" "$vaapi_device" "$gpu_detail" "$(hostname)" "$(uname -sr)" "$ffmpeg_version" "$duration" > "$proof_dir/receipt.txt"
+printf 'Hardware conversion verified: backend=%s encoder=%s duration=%ss\n' "$backend" "$encoder" "$duration"

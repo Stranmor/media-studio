@@ -55,7 +55,7 @@ curl --fail --location https://raw.githubusercontent.com/Stranmor/media-studio/m
 
 Для Debian/Ubuntu и Fedora/RHEL доступны binary assets в GitHub Release. Для Arch есть `packaging/arch/PKGBUILD`; после установки пакета выполните `media-studio install` для пользовательского Dolphin-меню.
 
-Экспериментальный Flatpak host-integration manifest находится в `packaging/flatpak/`: он сохраняет доступ к локальным media tools и user-systemd, поэтому не является sandboxed replacement для обычной Arch/Debian установки.
+Flatpak packaging is split by trust boundary: `packaging/flatpak/io.github.stranmor.MediaStudio.yml` is the strict sandbox profile, while `io.github.stranmor.MediaStudio.HostIntegration.yml` is an explicitly experimental host-integration profile that delegates media and desktop helpers through `flatpak-spawn --host`. CI builds both profiles and runs a real conversion smoke inside each installed bundle.
 
 ## CLI
 
