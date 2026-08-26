@@ -17,7 +17,7 @@ Media Studio — локальный конвертер медиа для KDE Dol
 
 ## Установка
 
-Нужны `ffmpeg`, `ffprobe`, `systemd-run`, `systemctl`, `kbuildsycoca6` или `kbuildsycoca5` и один диалоговый backend: `zenity` или `kdialog`. Для image-профилей нужен `magick`.
+Нужны `ffmpeg`, `ffprobe`, `systemd-run` и `systemctl`. `kbuildsycoca6`/`kbuildsycoca5` и один диалоговый backend (`zenity` или `kdialog`) рекомендуются для полной интеграции: без них меню устанавливаются, а cache/dialog возможности явно помечаются недоступными. Для image-профилей нужен `magick`.
 `zenity` показывает все расширенные параметры одной формой; `kdialog` использует последовательные окна с теми же параметрами.
 
 ```bash
@@ -41,7 +41,7 @@ curl --fail --location https://raw.githubusercontent.com/Stranmor/media-studio/m
 - config: `~/.config/media-studio/config.toml`;
 - job state: `~/.local/state/media-studio/jobs/`.
 
-Переиндексация KDE выполняется автоматически через доступный `kbuildsycoca6` или `kbuildsycoca5`.
+Переиндексация KDE выполняется автоматически через доступный `kbuildsycoca6` или `kbuildsycoca5`; если helper отсутствует, установка завершается с состоянием `kde_cache=not-available`.
 Каждое меню содержит только совместимые с MIME-группой действия; generic `desktop-file-validate` может ругаться на KDE-расширения `Service`/`Actions`, хотя KDE KIO их принимает.
 
 ## Использование в Dolphin
