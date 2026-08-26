@@ -16,9 +16,15 @@ clearly labeled as experimental.
 The release publish job downloads every gate receipt and runs
 `packaging/release/verify-gates.sh` before creating the GitHub release. Missing
 native checksums, Flatpak receipts, hardware markers, or verified-result logs
-fail the publish job.
+fail the publish job. The verifier also re-runs FFprobe positive-duration and
+full-decode checks for every downloaded media output, validates the expected
+Flatpak app IDs, and checks exact hardware encoder fields.
 
 The hosted host-integration smoke records `tool_mode=runtime-fallback` because
 the privileged build container has no desktop Flatpak session helper; the
 published bundle remains explicitly experimental and uses host delegation on a
 real KDE session.
+
+Arch VCS packaging resolves the matching `v$pkgver` release tag and rejects a
+checkout that is not exactly that tag; Debian and RPM metadata declare the
+FFmpeg and systemd runtime prerequisites used by the installer.

@@ -32,10 +32,19 @@ flatpak-builder --force-clean build-dir packaging/flatpak/io.github.stranmor.Med
 installed bundle, verifies the output with FFprobe and full decode, and checks
 the Media Studio `RESULT=verified` job marker.
 
+The canonical manifests build the checked-out candidate (`type: dir`) so a
+local build cannot silently drift to a later branch commit; the CI manifests
+are parity-checked copies of the same contract.
+
 Hosted CI runs the experimental host-integration bundle with an explicit
 `runtime-fallback` smoke mode because a GitHub container has no desktop
 Flatpak session helper; normal desktop launches keep the default host-tool
 delegation through `flatpak-spawn --host`.
+
+`media-studio install` requires FFmpeg/FFprobe and user-systemd. KDE cache
+builders and `zenity`/`kdialog` are optional helpers: without them the menus
+are still installed, the cache update is reported as unavailable, and the
+advanced action reports the missing dialog backend when invoked.
 
 ## GPU runners
 

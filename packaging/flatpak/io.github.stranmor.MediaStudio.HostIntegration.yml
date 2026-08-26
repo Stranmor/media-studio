@@ -29,9 +29,8 @@ modules:
       build-args:
         - --share=network
     sources:
-      - type: git
-        url: https://github.com/Stranmor/media-studio.git
-        branch: main
+      - type: dir
+        path: ../..
     build-commands:
       - cargo build --release
       - install -Dm755 target/release/media-studio /app/bin/media-studio

@@ -12,8 +12,16 @@ optdepends=(
   'zenity: single-window advanced settings'
   'kdialog: KDE fallback advanced settings'
 )
-source=('git+https://github.com/Stranmor/media-studio.git#branch=main')
+# Release packages are built from the matching immutable release tag, never
+# from a moving branch. The prepare check rejects an unexpected checkout.
+source=("git+https://github.com/Stranmor/media-studio.git#tag=v$pkgver")
 sha256sums=('SKIP')
+
+prepare() {
+  cd "$srcdir/media-studio"
+  expected_tag="v$pkgver"
+  test "$(git describe --tags --exact-match HEAD 2>/dev/null)" = "$expected_tag"
+}
 
 build() {
   cd "$srcdir/media-studio"

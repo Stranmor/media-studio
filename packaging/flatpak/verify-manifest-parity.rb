@@ -11,7 +11,8 @@ ci = YAML.load_file(ci_path)
 
 expected_app_id = kind == "sandbox" ? "io.github.stranmor.MediaStudio" : "io.github.stranmor.MediaStudio.HostIntegration"
 abort "unexpected #{kind} app id" unless canonical["app-id"] == expected_app_id
-abort "#{kind} canonical source must track main" unless canonical.dig("modules", 0, "sources", 0, "branch") == "main"
+expected_source = { "type" => "dir", "path" => "../.." }
+abort "#{kind} canonical source must use the checked-out candidate" unless canonical.dig("modules", 0, "sources", 0) == expected_source
 
 if kind == "sandbox"
   expected_finish_args = [
@@ -61,7 +62,6 @@ else
 end
 
 normalized = Marshal.load(Marshal.dump(canonical))
-normalized["modules"][0]["sources"] = [{ "type" => "dir", "path" => "../.." }]
 abort "#{kind} CI manifest drifted from canonical manifest" unless normalized == ci
 
 puts "manifest_contract=verified kind=#{kind}"

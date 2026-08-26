@@ -144,6 +144,18 @@ validate_runner_symlinks() {
   done < <(find "$root" -type l -print0)
 }
 
+validate_unit_field() {
+  local value="$1"
+  local label="$2"
+  # Values below are written directly into systemd unit fields. Restricting
+  # them to parser-safe path/PATH characters is fail-closed and avoids turning
+  # spaces, quotes, specifiers, or control characters into unit syntax.
+  [[ "$value" =~ ^[-A-Za-z0-9._/+=:]+$ ]] || {
+    printf 'unsafe systemd unit value for %s: %s\n' "$label" "$value" >&2
+    exit 2
+  }
+}
+
 for tool in bash curl tar sha256sum ffmpeg ffprobe systemd-run systemctl cargo rustc cc; do
   command -v "$tool" >/dev/null || {
     printf 'missing required tool: %s\n' "$tool" >&2
@@ -375,6 +387,15 @@ unit_dir="$HOME/.config/systemd/user"
 unit_name="media-studio-actions-runner-$backend.service"
 unit_path="$unit_dir/$unit_name"
 validate_path_components "$unit_dir" "systemd unit directory"
+validate_unit_field "$runner_dir" "runner directory"
+validate_unit_field "$runner_bash" "runner shell"
+validate_unit_field "$runner_path" "PATH"
+validate_unit_field "$cc_bin" "C compiler"
+validate_unit_field "$unit_dir" "systemd unit directory"
+if (( nix_ld_mode )); then
+  validate_unit_field "$nix_ld_loader" "NIX_LD loader"
+  validate_unit_field "$nix_ld_library_path" "NIX_LD_LIBRARY_PATH"
+fi
 mkdir -p "$unit_dir"
 if [[ -L "$unit_path" ]]; then
   printf 'refusing a symlinked systemd unit path: %s\n' "$unit_path" >&2

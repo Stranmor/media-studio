@@ -13,6 +13,26 @@ gates_dir=${2:?usage: verify-gates.sh RELEASE_ASSETS RELEASE_GATES}
   exit 2
 }
 
+verify_media_output() {
+  local output="$1"
+  local label="$2"
+  local duration
+  command -v ffprobe >/dev/null || {
+    printf 'ffprobe is required to validate %s\n' "$label" >&2
+    exit 1
+  }
+  command -v ffmpeg >/dev/null || {
+    printf 'ffmpeg is required to validate %s\n' "$label" >&2
+    exit 1
+  }
+  duration="$(ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "$output")"
+  awk -v duration="$duration" 'BEGIN { exit !(duration ~ /^[0-9]+([.][0-9]+)?$/ && duration > 0) }' || {
+    printf '%s has no positive media duration: %s\n' "$label" "$duration" >&2
+    exit 1
+  }
+  ffmpeg -hide_banner -nostdin -loglevel error -xerror -i "$output" -map 0:v? -map 0:a? -f null -
+}
+
 for arch in x86_64 aarch64; do
   binary="media-studio-linux-$arch"
   test -s "$assets_dir/$binary"
@@ -34,8 +54,11 @@ for backend in vaapi nvenc; do
   test -s "$output"
   test -s "$checksum"
   (cd "$gates_dir/hardware-$backend" && sha256sum -c output.sha256)
+  verify_media_output "$output" "hardware-$backend output"
   grep -Fx 'result=verified' "$receipt"
   grep -Fx "backend=$backend" "$receipt"
+  grep -Fx "encoder=h264_$backend" "$receipt"
+  grep -Eq '^runner=[^[:space:]]+$' "$receipt"
   backend_label="$(printf '%s' "$backend" | tr '[:lower:]' '[:upper:]')"
   encoder="h264_$backend"
   grep -Fx "HARDWARE_USED=$backend_label ENCODER=$encoder" "$job_log"
@@ -64,6 +87,13 @@ for kind in sandbox host-integration; do
   test -s "$output"
   test -s "$checksum"
   (cd "$gates_dir/flatpak-$kind" && sha256sum -c output.sha256)
+  verify_media_output "$output" "Flatpak $kind output"
+  if [ "$kind" = sandbox ]; then
+    expected_app_id='io.github.stranmor.MediaStudio'
+  else
+    expected_app_id='io.github.stranmor.MediaStudio.HostIntegration'
+  fi
+  grep -Fx "app_id=$expected_app_id" "$receipt"
   grep -Fx 'result=verified' "$receipt"
   grep -Fx 'RESULT=verified' "$job_log"
   if [ "$kind" = sandbox ]; then

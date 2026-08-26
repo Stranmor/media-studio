@@ -129,6 +129,10 @@ jobs:
             grep -F 'pkgname=media-studio' packaging/arch/PKGBUILD
             grep -F 'pkgver=0.2.2' packaging/arch/PKGBUILD
           fi
+          grep -F 'source=("git+https://github.com/Stranmor/media-studio.git#tag=v$pkgver")' packaging/arch/PKGBUILD
+          grep -F 'depends = "ffmpeg, systemd"' Cargo.toml
+          grep -F 'ffmpeg = "*"' Cargo.toml
+          grep -F 'systemd = "*"' Cargo.toml
           ruby packaging/flatpak/verify-manifest-parity.rb sandbox packaging/flatpak/io.github.stranmor.MediaStudio.yml packaging/flatpak/io.github.stranmor.MediaStudio.sandbox.ci.yml
           ruby packaging/flatpak/verify-manifest-parity.rb host-integration packaging/flatpak/io.github.stranmor.MediaStudio.HostIntegration.yml packaging/flatpak/io.github.stranmor.MediaStudio.HostIntegration.ci.yml
           cargo metadata --no-deps --format-version 1 >/dev/null

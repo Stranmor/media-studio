@@ -649,12 +649,9 @@ fn preflight_install() -> Result<()> {
             missing.join(", ")
         );
     }
-    if kde_cache_builder().is_none() {
-        bail!("нельзя установить Media Studio: отсутствуют kbuildsycoca6 или kbuildsycoca5");
-    }
-    if find_on_path("zenity").is_none() && find_on_path("kdialog").is_none() {
-        bail!("нельзя установить Media Studio: нужен zenity или kdialog для расширенного меню");
-    }
+    // KDE cache builders and dialog backends are optional integration helpers.
+    // The service menus and core queue remain installable without them; the
+    // caller receives an explicit status/warning and can add the helper later.
     Ok(())
 }
 
@@ -873,18 +870,22 @@ fn install(force_config: bool) -> Result<()> {
             .collect::<Vec<_>>()
             .join(",")
     );
-    println!(
-        "kde_cache={}",
-        match cache {
-            Some(Ok(status)) if status.success() => "updated",
-            Some(Ok(status)) =>
-                return Err(anyhow::anyhow!(
-                    "KDE cache builder завершился с кодом {status}"
-                )),
-            None => return Err(anyhow::anyhow!("не найден kbuildsycoca6 или kbuildsycoca5")),
-            Some(Err(error)) => return Err(error.into()),
+    let cache_state = match cache {
+        Some(Ok(status)) if status.success() => "updated",
+        Some(Ok(status)) => {
+            return Err(anyhow::anyhow!(
+                "KDE cache builder завершился с кодом {status}"
+            ));
         }
-    );
+        Some(Err(error)) => return Err(error.into()),
+        None => {
+            eprintln!(
+                "предупреждение: kbuildsycoca6/kbuildsycoca5 не найдены; KDE cache обновит система"
+            );
+            "not-available"
+        }
+    };
+    println!("kde_cache={cache_state}");
     Ok(())
 }
 

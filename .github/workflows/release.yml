@@ -96,6 +96,14 @@ jobs:
           path: release-gates/flatpak-host-integration
           pattern: media-studio-flatpak-smoke-host-integration-*
           merge-multiple: true
+      - name: Verify release media tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v ffmpeg
+          command -v ffprobe
+          ffmpeg -version | head -n1
+          ffprobe -version | head -n1
       - name: Verify every release gate receipt
         shell: bash
         run: packaging/release/verify-gates.sh release-assets release-gates

@@ -29,7 +29,12 @@ maintainer = "Ivan Plankin"
 copyright = "2026 Ivan Plankin"
 section = "utils"
 priority = "optional"
+depends = "ffmpeg, systemd"
 assets = [["target/release/media-studio", "usr/bin/media-studio", "755"]]
 
 [package.metadata.generate-rpm]
 assets = [{ source = "target/release/media-studio", dest = "/usr/bin/media-studio", mode = "0755" }]
+
+[package.metadata.generate-rpm.requires]
+ffmpeg = "*"
+systemd = "*"
