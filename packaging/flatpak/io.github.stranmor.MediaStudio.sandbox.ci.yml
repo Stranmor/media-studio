@@ -37,5 +37,8 @@ modules:
     build-commands:
       - cargo build --release
       - install -d /app/lib/codecs-extra
+      - install -d /app/bin
+      - ln -srv /usr/bin/ffmpeg /app/bin/ffmpeg
+      - ln -srv /usr/bin/ffprobe /app/bin/ffprobe
       - install -Dm755 target/release/media-studio /app/bin/media-studio
       - install -Dm644 packaging/flatpak/io.github.stranmor.MediaStudio.desktop /app/share/applications/io.github.stranmor.MediaStudio.desktop

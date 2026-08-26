@@ -100,7 +100,8 @@ gpu_detail=""
 if [[ "$backend" = nvenc ]]; then
   gpu_detail="$(nvidia-smi --query-gpu=name --format=csv,noheader | sed -n '1p')"
 fi
-sha256sum "$output_file" | sed 's#  .*#  output.mp4#' > "$proof_dir/output.sha256"
+cp "$output_file" "$proof_dir/output.mp4"
+sha256sum "$proof_dir/output.mp4" | sed 's#  .*#  output.mp4#' > "$proof_dir/output.sha256"
 cp "$log_file" "$proof_dir/job.log"
 printf 'schema_version=1\nbackend=%s\nencoder=%s\nvaapi_device=%s\nhardware_detail=%s\nrunner=%s\nkernel=%s\nffmpeg=%s\nduration_seconds=%s\nresult=verified\n' \
   "$backend" "$encoder" "$vaapi_device" "$gpu_detail" "$(hostname)" "$(uname -sr)" "$ffmpeg_version" "$duration" > "$proof_dir/receipt.txt"

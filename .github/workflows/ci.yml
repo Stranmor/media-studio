@@ -3,6 +3,13 @@ name: CI
 on:
   push:
   pull_request:
+  workflow_call:
+    inputs:
+      checkout_ref:
+        description: Git ref to test
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -12,6 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@main
+        with:
+          ref: ${{ inputs.checkout_ref || github.ref }}
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt, clippy
@@ -24,6 +33,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@main
+        with:
+          ref: ${{ inputs.checkout_ref || github.ref }}
       - name: Install KDE and media dependencies
         run: |
           sudo apt-get update
@@ -58,6 +69,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@main
+        with:
+          ref: ${{ inputs.checkout_ref || github.ref }}
       - uses: dtolnay/rust-toolchain@stable
       - name: Validate packaging manifests
         shell: bash
@@ -70,14 +83,13 @@ jobs:
             grep -F 'pkgname=media-studio' packaging/arch/PKGBUILD
             grep -F 'pkgver=0.2.1' packaging/arch/PKGBUILD
           fi
-          ruby -e 'require "yaml"; manifest = YAML.load_file("packaging/flatpak/io.github.stranmor.MediaStudio.yml"); abort "bad sandbox app id" unless manifest["app-id"] == "io.github.stranmor.MediaStudio"; abort "sandbox must not use host filesystem" if manifest["finish-args"].any? { |arg| arg.include?("filesystem=host") || arg.include?("socket=session-bus") || arg.include?("talk-name=") }; abort "sandbox source must track main" unless manifest.dig("modules", 0, "sources", 0, "branch") == "main"; codecs = manifest.dig("add-extensions", "org.freedesktop.Platform.codecs-extra"); abort "sandbox must expose codecs-extra" unless codecs == {"directory" => "lib/codecs-extra", "version" => "25.08-extra", "add-ld-path" => "lib"}'
-          ruby -e 'require "yaml"; release = YAML.load_file("packaging/flatpak/io.github.stranmor.MediaStudio.yml"); ci = YAML.load_file("packaging/flatpak/io.github.stranmor.MediaStudio.sandbox.ci.yml"); release["modules"][0]["sources"] = [{"type" => "dir", "path" => "../.."}]; abort "CI sandbox manifest drifted from release manifest" unless release == ci'
-          ruby -e 'require "yaml"; manifest = YAML.load_file("packaging/flatpak/io.github.stranmor.MediaStudio.HostIntegration.yml"); abort "bad host app id" unless manifest["app-id"] == "io.github.stranmor.MediaStudio.HostIntegration"; abort "host wrapper contract missing" unless manifest["modules"][0]["build-commands"].any? { |line| line.include?("media-studio-host-tool") }; abort "host KIO permission missing" unless manifest["finish-args"].include?("--filesystem=xdg-data/kio")'
-          ruby -e 'require "yaml"; release = YAML.load_file("packaging/flatpak/io.github.stranmor.MediaStudio.HostIntegration.yml"); ci = YAML.load_file("packaging/flatpak/io.github.stranmor.MediaStudio.HostIntegration.ci.yml"); release["modules"][0]["sources"] = [{"type" => "dir", "path" => "../.."}]; abort "CI host manifest drifted from release manifest" unless release == ci'
+          ruby packaging/flatpak/verify-manifest-parity.rb sandbox packaging/flatpak/io.github.stranmor.MediaStudio.yml packaging/flatpak/io.github.stranmor.MediaStudio.sandbox.ci.yml
+          ruby packaging/flatpak/verify-manifest-parity.rb host-integration packaging/flatpak/io.github.stranmor.MediaStudio.HostIntegration.yml packaging/flatpak/io.github.stranmor.MediaStudio.HostIntegration.ci.yml
           cargo metadata --no-deps --format-version 1 >/dev/null
           test -s packaging/flatpak/io.github.stranmor.MediaStudio.desktop
           test -s packaging/flatpak/io.github.stranmor.MediaStudio.HostIntegration.desktop
           test -x packaging/flatpak/host-tool-wrapper
           test -x packaging/flatpak/conversion-smoke.sh
+          test -s packaging/flatpak/verify-manifest-parity.rb
           test -x packaging/release/verify-gates.sh
           grep -F "for tool in ffmpeg ffprobe magick systemd-run systemctl kbuildsycoca6 kbuildsycoca5 zenity kdialog; do ln -s media-studio-host-tool /app/bin/\$tool; done" packaging/flatpak/io.github.stranmor.MediaStudio.HostIntegration.yml
