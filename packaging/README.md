@@ -51,4 +51,7 @@ advanced action reports the missing dialog backend when invoked.
 Use `packaging/gpu/provision-runner.sh` to register one dedicated VAAPI or
 NVENC Actions runner and keep it under a bounded user-systemd service. The
 workflow emits a receipt and preserves the conversion log as an Actions
-artifact.
+artifact. The generated service owns an exclusive runner lock, so a second
+runner process for the same directory fails closed instead of corrupting job
+receipts; run the provisioner again only after any manually started runner has
+exited.

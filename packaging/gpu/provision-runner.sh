@@ -156,7 +156,7 @@ validate_unit_field() {
   }
 }
 
-for tool in bash curl tar sha256sum ffmpeg ffprobe systemd-run systemctl cargo rustc cc; do
+for tool in bash curl tar sha256sum ffmpeg ffprobe systemd-run systemctl cargo rustc cc flock; do
   command -v "$tool" >/dev/null || {
     printf 'missing required tool: %s\n' "$tool" >&2
     exit 1
@@ -386,9 +386,13 @@ runner_path="$(dirname "$cc_bin"):$runner_path"
 unit_dir="$HOME/.config/systemd/user"
 unit_name="media-studio-actions-runner-$backend.service"
 unit_path="$unit_dir/$unit_name"
+lock_path="$runner_dir/.runner.lock"
+flock_bin="$(command -v flock)"
 validate_path_components "$unit_dir" "systemd unit directory"
 validate_unit_field "$runner_dir" "runner directory"
 validate_unit_field "$runner_bash" "runner shell"
+validate_unit_field "$flock_bin" "flock"
+validate_unit_field "$lock_path" "runner lock"
 validate_unit_field "$runner_path" "PATH"
 validate_unit_field "$cc_bin" "C compiler"
 validate_unit_field "$unit_dir" "systemd unit directory"
@@ -405,6 +409,12 @@ if [[ -f "$unit_path" && ! -s "$unit_path" ]]; then
   # Recover from an interrupted write (systemd treats an empty unit as masked).
   rm -f -- "$unit_path"
 fi
+if [[ -L "$lock_path" ]]; then
+  printf 'refusing a symlinked runner lock path: %s\n' "$lock_path" >&2
+  exit 2
+fi
+touch "$lock_path"
+chmod 600 "$lock_path"
 mkdir -p "$runner_dir/cargo-home"
 requires_mount=""
 if [[ "$runner_dir" == /mnt/data/* ]]; then
@@ -426,7 +436,7 @@ printf '%s\n' \
   '' \
   '[Service]' \
   "WorkingDirectory=$runner_dir" \
-  "ExecStart=$runner_bash $runner_dir/run.sh" \
+  "ExecStart=$flock_bin --no-fork --nonblock --exclusive $lock_path $runner_bash $runner_dir/run.sh" \
   "Environment=PATH=$runner_path" \
   "Environment=CARGO_HOME=$runner_dir/cargo-home" \
   "Environment=CC=$cc_bin" \
