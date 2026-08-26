@@ -164,7 +164,11 @@ fn vaapi_environment_arg(device: Option<&str>) -> Option<String> {
 fn inherited_environment_args() -> Vec<String> {
     ["HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME"]
         .into_iter()
-        .filter_map(|key| env::var(key).ok().map(|value| format!("--setenv={key}={value}")))
+        .filter_map(|key| {
+            env::var(key)
+                .ok()
+                .map(|value| format!("--setenv={key}={value}"))
+        })
         .collect()
 }
 
@@ -192,7 +196,9 @@ mod tests {
         let args = super::inherited_environment_args();
         for key in ["HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME"] {
             if std::env::var_os(key).is_some() {
-                assert!(args.iter().any(|arg| arg.starts_with(&format!("--setenv={key}="))));
+                assert!(args
+                    .iter()
+                    .any(|arg| arg.starts_with(&format!("--setenv={key}="))));
             }
         }
     }
