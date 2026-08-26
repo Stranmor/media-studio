@@ -1,5 +1,5 @@
 pkgname=media-studio
-pkgver=0.2.1
+pkgver=0.2.2
 pkgrel=1
 pkgdesc='Dolphin-integrated local media conversion studio'
 arch=('x86_64' 'aarch64')
@@ -12,7 +12,7 @@ optdepends=(
   'zenity: single-window advanced settings'
   'kdialog: KDE fallback advanced settings'
 )
-source=('git+https://github.com/Stranmor/media-studio.git#commit=63dc708153b76ab7f7527579f103ce24ac106872')
+source=('git+https://github.com/Stranmor/media-studio.git#branch=main')
 sha256sums=('SKIP')
 
 build() {

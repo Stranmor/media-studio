@@ -78,10 +78,10 @@ jobs:
           set -euo pipefail
           bash -n packaging/arch/PKGBUILD
           if command -v makepkg >/dev/null 2>&1; then
-            (cd packaging/arch && makepkg --packagelist | grep -F 'media-studio-0.2.1-1-')
+            (cd packaging/arch && makepkg --packagelist | grep -F 'media-studio-0.2.2-1-')
           else
             grep -F 'pkgname=media-studio' packaging/arch/PKGBUILD
-            grep -F 'pkgver=0.2.1' packaging/arch/PKGBUILD
+            grep -F 'pkgver=0.2.2' packaging/arch/PKGBUILD
           fi
           ruby packaging/flatpak/verify-manifest-parity.rb sandbox packaging/flatpak/io.github.stranmor.MediaStudio.yml packaging/flatpak/io.github.stranmor.MediaStudio.sandbox.ci.yml
           ruby packaging/flatpak/verify-manifest-parity.rb host-integration packaging/flatpak/io.github.stranmor.MediaStudio.HostIntegration.yml packaging/flatpak/io.github.stranmor.MediaStudio.HostIntegration.ci.yml

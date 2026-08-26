@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.2.2] - 2026-08-26
+
+### Added
+
+- Trusted VAAPI and NVENC runner provisioning with durable user-systemd services and hardware receipts.
+- Strict sandbox and explicitly experimental host-integration Flatpak profiles.
+- Installed-bundle conversion smoke with FFprobe, full decode, checksum, and verified job receipts.
+- Release gates that validate native, Flatpak, and hardware evidence before publication.
+
+### Changed
+
+- Flatpak and GPU workflows are restricted to trusted release paths and exact source refs.
+- Host-integration smoke records the hosted CI runtime fallback explicitly instead of implying desktop host delegation.
+
 ## [0.2.1] - 2026-08-25
 
 ### Added

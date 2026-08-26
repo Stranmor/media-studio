@@ -112,7 +112,7 @@ jobs:
           flatpak info --user "$APP_ID"
           version_output="$(timeout 30s flatpak run --command=media-studio "$APP_ID" --version)"
           printf '%s\n' "$version_output"
-          printf '%s\n' "$version_output" | grep -F 'media-studio 0.2.1'
+          printf '%s\n' "$version_output" | grep -F 'media-studio 0.2.2'
           if [ "$KIND" = host-integration ]; then
             tool_contract="$(timeout 30s flatpak run --env=MEDIA_STUDIO_HOST_TOOL_MODE=runtime --command=sh "$APP_ID" -c 'set -eu; command -v ffmpeg; command -v ffprobe; ffmpeg -hide_banner -encoders')"
           else
