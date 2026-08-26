@@ -36,5 +36,6 @@ modules:
         path: ../..
     build-commands:
       - cargo build --release
+      - install -d /app/lib/codecs-extra
       - install -Dm755 target/release/media-studio /app/bin/media-studio
       - install -Dm644 packaging/flatpak/io.github.stranmor.MediaStudio.desktop /app/share/applications/io.github.stranmor.MediaStudio.desktop
