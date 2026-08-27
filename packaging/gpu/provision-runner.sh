@@ -9,7 +9,7 @@ Options:
   --repo OWNER/REPO       GitHub repository (default: Stranmor/media-studio)
   --runner-dir PATH       Dedicated runner directory
   --runner-name NAME      GitHub runner name
-  --token-stdin           Read the one-time registration token from stdin
+  --token-stdin           Read the one-time registration token from stdin (preferred)
   --replace               Replace an existing runner configuration
 
 NixOS:
@@ -165,7 +165,7 @@ validate_unit_field() {
   }
 }
 
-for tool in bash curl tar sha256sum ffmpeg ffprobe systemd-run systemctl cargo rustc cc flock ps; do
+for tool in bash curl tar sha256sum ffmpeg ffprobe systemd-run systemctl cargo rustc cc flock ps expect; do
   command -v "$tool" >/dev/null || {
     printf 'missing required tool: %s\n' "$tool" >&2
     exit 1
@@ -212,8 +212,9 @@ if (( read_token )); then
 else
   registration_token="${RUNNER_REGISTRATION_TOKEN:-}"
 fi
+unset RUNNER_REGISTRATION_TOKEN
 if [[ -z "${registration_token:-}" ]]; then
-  printf 'a one-time registration token is required via --token-stdin or RUNNER_REGISTRATION_TOKEN\n' >&2
+  printf 'a one-time registration token is required; prefer --token-stdin (RUNNER_REGISTRATION_TOKEN is a compatibility fallback)\n' >&2
   exit 2
 fi
 
@@ -389,15 +390,57 @@ if (( replace )) && [[ -e "$runner_dir/.runner" ]]; then
   # requiring a second, separately scoped removal token.
   (cd "$runner_dir" && env "${config_env[@]}" "$runner_bash" ./config.sh remove --local)
 fi
-(cd "$runner_dir" && env "${config_env[@]}" "$runner_bash" ./config.sh \
-  --unattended \
-  --replace \
-  --url "https://github.com/$repo" \
-  --token "$registration_token" \
-  --name "$runner_name" \
-  --labels "self-hosted,linux,gpu,$backend" \
-  --work _work)
-unset registration_token
+
+# The upstream runner reads registration tokens with Console.ReadKey when the
+# token option is omitted, so a redirected pipe is rejected. Feed the token
+# through a private inherited file descriptor into an isolated PTY instead of
+# placing it in Runner.Listener argv or the environment.
+configure_with_token_pty() {
+  local runner_root="$1"
+  local runner_shell="$2"
+  local runner_url="$3"
+  local configured_name="$4"
+  local configured_labels="$5"
+  local config_status
+  exec 3<<<"$registration_token"
+  unset registration_token
+  if (
+    cd "$runner_root"
+    env "${config_env[@]}" expect - "$runner_shell" "$runner_url" "$configured_name" "$configured_labels" <<'EXPECT_SCRIPT'
+set timeout 180
+log_user 0
+set runner_shell [lindex $argv 0]
+set runner_url [lindex $argv 1]
+set runner_name [lindex $argv 2]
+set runner_labels [lindex $argv 3]
+set token_channel [open "/proc/self/fd/3" r]
+set token [string trim [read $token_channel]]
+close $token_channel
+spawn -noecho $runner_shell ./config.sh --url $runner_url --name $runner_name --labels $runner_labels --work _work --replace
+expect {
+    -re {What is your runner register token\?} {
+        send -- "$token\r"
+        exp_continue
+    }
+    eof {}
+    timeout { catch { close }; catch { wait }; exit 124 }
+}
+set result [wait]
+set exit_code [lindex $result 3]
+if {$exit_code eq ""} { exit 1 }
+exit $exit_code
+EXPECT_SCRIPT
+  ); then
+    config_status=0
+  else
+    config_status=$?
+  fi
+  exec 3<&-
+  return "$config_status"
+}
+
+configure_with_token_pty "$runner_dir" "$runner_bash" "https://github.com/$repo" \
+  "$runner_name" "self-hosted,linux,gpu,$backend"
 # config.sh snapshots LD_LIBRARY_PATH into .env. Keep that compatibility path
 # private to the runner service rather than leaking it into every job process.
 if [[ -f "$runner_dir/.env" ]]; then

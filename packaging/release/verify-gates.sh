@@ -67,15 +67,51 @@ verify_rpm() {
   [[ "$(rpm -qp --queryformat '%{ARCH}' "$package")" == "$expected_arch" ]]
 }
 
+verify_checksum_manifest() {
+  local manifest="$1"
+  local target="$2"
+  local expected_name="$3"
+  local label="$4"
+  local hash name extra actual
+  local record_count=0
+  [[ -s "$manifest" ]]
+  while read -r hash name extra; do
+    [[ -n "${hash:-}" ]] || continue
+    record_count=$((record_count + 1))
+    [[ "$record_count" -eq 1 ]] || {
+      printf '%s must contain exactly one checksum record\n' "$label" >&2
+      exit 1
+    }
+    [[ "$hash" =~ ^[0-9a-fA-F]{64}$ ]] || {
+      printf '%s contains an invalid SHA-256 digest\n' "$label" >&2
+      exit 1
+    }
+    name="${name#\*}"
+    [[ "$name" == "$expected_name" && -z "${extra:-}" ]] || {
+      printf '%s is not bound to %s\n' "$label" "$expected_name" >&2
+      exit 1
+    }
+    actual="$(sha256sum -- "$target" | awk '{ print $1 }')"
+    [[ "$actual" == "$hash" ]] || {
+      printf '%s digest mismatch for %s\n' "$label" "$expected_name" >&2
+      exit 1
+    }
+  done < "$manifest"
+  [[ "$record_count" -eq 1 ]] || {
+    printf '%s does not contain a checksum record\n' "$label" >&2
+    exit 1
+  }
+}
+
 verify_tarball() {
   local tarball="$1"
   local binary="$2"
-  local archive_sha binary_sha
+  local expected_sha archive_sha
   [[ -s "$tarball" ]]
   tar -tzf "$tarball" | grep -Fx "$binary" >/dev/null
+  expected_sha="$(sha256sum -- "$assets_dir/$binary" | awk '{ print $1 }')"
   archive_sha="$(tar -xOf "$tarball" "$binary" | sha256sum | awk '{ print $1 }')"
-  binary_sha="$(awk 'NR == 1 { print $1; exit }' "$assets_dir/$binary.sha256")"
-  [[ "$archive_sha" == "$binary_sha" ]]
+  [[ "$archive_sha" == "$expected_sha" ]]
 }
 
 verify_media_output() {
@@ -102,7 +138,7 @@ for arch in x86_64 aarch64; do
   binary="media-studio-linux-$arch"
   test -s "$assets_dir/$binary"
   test -s "$assets_dir/$binary.sha256"
-  (cd "$assets_dir" && sha256sum -c "$binary.sha256")
+  verify_checksum_manifest "$assets_dir/$binary.sha256" "$assets_dir/$binary" "$binary" "$binary checksum"
   verify_tarball "$assets_dir/$binary.tar.gz" "$binary"
   case "$arch" in
     x86_64)
@@ -135,7 +171,7 @@ for backend in vaapi nvenc; do
   test -s "$job_log"
   test -s "$output"
   test -s "$checksum"
-  (cd "$gates_dir/hardware-$backend" && sha256sum -c output.sha256)
+  verify_checksum_manifest "$checksum" "$output" output.mp4 "hardware-$backend checksum"
   verify_media_output "$output" "hardware-$backend output"
   grep -Fx 'result=verified' "$receipt"
   grep -Fx "backend=$backend" "$receipt"
@@ -169,7 +205,7 @@ for kind in sandbox host-integration; do
   test -s "$job_log"
   test -s "$output"
   test -s "$checksum"
-  (cd "$gates_dir/flatpak-$kind" && sha256sum -c output.sha256)
+  verify_checksum_manifest "$checksum" "$output" output.mp4 "Flatpak $kind checksum"
   verify_media_output "$output" "Flatpak $kind output"
   if [ "$kind" = sandbox ]; then
     expected_app_id='io.github.stranmor.MediaStudio'

@@ -157,6 +157,13 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@main
+        with:
+          ref: ${{ github.ref }}
+          persist-credentials: false
+      - name: Verify Arch source identity
+        env:
+          EXPECTED_SHA: ${{ github.sha }}
+        run: packaging/arch/verify-source.sh --repo https://github.com/Stranmor/media-studio.git --tag "${GITHUB_REF_NAME}" --expected-commit "$EXPECTED_SHA"
       - name: Build Arch package in the current Arch image
         shell: bash
         run: |

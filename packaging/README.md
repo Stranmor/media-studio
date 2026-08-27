@@ -63,3 +63,9 @@ artifact. The generated service owns an exclusive runner lock, so a second
 runner process for the same directory fails closed instead of corrupting job
 receipts; run the provisioner again only after any manually started runner has
 exited.
+
+Pass the one-time registration token through `--token-stdin` (the preferred
+route). Provisioning uses the `expect` PTY helper to feed it through a private
+file descriptor, never through `Runner.Listener` argv or a persistent
+environment variable; `RUNNER_REGISTRATION_TOKEN` remains only as a compatibility
+fallback and is cleared immediately after read.

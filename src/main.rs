@@ -999,8 +999,13 @@ fn uninstall(purge: bool) -> Result<()> {
             fs::remove_dir_all(state_dir)?;
         }
     }
-    let cache =
-        kde_cache_builder().map(|builder| Command::new(builder).arg("--noincremental").status());
+    let cache_probe = kde_cache_probe();
+    let cache = match &cache_probe {
+        runtime::OptionalStatus::Available(builder) => {
+            Some(Command::new(builder).arg("--noincremental").status())
+        }
+        runtime::OptionalStatus::Missing | runtime::OptionalStatus::Unavailable(_) => None,
+    };
     println!("uninstalled_binary={}", binary.display());
     println!(
         "uninstalled_service_menus={}",
@@ -1009,10 +1014,22 @@ fn uninstall(purge: bool) -> Result<()> {
     println!("purged={purge}");
     match cache {
         Some(Ok(status)) if status.success() => {}
-        Some(Ok(status)) => warnings.push(format!("KDE cache builder завершился с кодом {status}")),
-        None => warnings
-            .push("kbuildsycoca6 и kbuildsycoca5 не найдены; KDE cache не обновлён".to_string()),
-        Some(Err(error)) => warnings.push(format!("не удалось обновить KDE cache: {error}")),
+        Some(Ok(status)) => eprintln!(
+            "предупреждение: KDE cache builder завершился с кодом {status}; удаление завершено"
+        ),
+        Some(Err(error)) => eprintln!(
+            "предупреждение: не удалось обновить KDE cache ({error}); удаление завершено"
+        ),
+        None => match cache_probe {
+            runtime::OptionalStatus::Unavailable(path) => eprintln!(
+                "предупреждение: KDE cache builder недоступен ({}) после capability probe; удаление завершено",
+                path.display()
+            ),
+            runtime::OptionalStatus::Missing => eprintln!(
+                "предупреждение: kbuildsycoca6 и kbuildsycoca5 не найдены; удаление завершено"
+            ),
+            runtime::OptionalStatus::Available(_) => unreachable!("cache probe drifted"),
+        },
     }
     if warnings.is_empty() {
         Ok(())
