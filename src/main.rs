@@ -1363,13 +1363,6 @@ fn find_on_path(name: &str) -> Option<PathBuf> {
     runtime::optional(name)
 }
 
-fn kde_cache_builder() -> Option<PathBuf> {
-    match kde_cache_probe() {
-        runtime::OptionalStatus::Available(path) => Some(path),
-        runtime::OptionalStatus::Missing | runtime::OptionalStatus::Unavailable(_) => None,
-    }
-}
-
 fn kde_cache_probe() -> runtime::OptionalStatus {
     runtime::probe_first(&["kbuildsycoca6", "kbuildsycoca5"])
 }
