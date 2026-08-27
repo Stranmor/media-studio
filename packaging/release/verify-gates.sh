@@ -13,6 +13,71 @@ gates_dir=${2:?usage: verify-gates.sh RELEASE_ASSETS RELEASE_GATES}
   exit 2
 }
 
+[[ -s Cargo.toml ]] || {
+  printf 'Cargo.toml is required to validate package versions\n' >&2
+  exit 2
+}
+expected_version="$(awk -F'"' '$1 == "version = " { print $2; exit }' Cargo.toml)"
+[[ "$expected_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] || {
+  printf 'could not resolve a valid package version from Cargo.toml\n' >&2
+  exit 2
+}
+
+single_asset() {
+  local pattern="$1"
+  local label="$2"
+  local path
+  local -a matches=()
+  while IFS= read -r -d '' path; do
+    matches+=("$path")
+  done < <(find "$assets_dir" -maxdepth 1 -type f -name "$pattern" -print0 | sort -z)
+  if ((${#matches[@]} != 1)); then
+    printf 'expected exactly one %s matching %s, found %s\n' \
+      "$label" "$pattern" "${#matches[@]}" >&2
+    exit 1
+  fi
+  printf '%s\n' "${matches[0]}"
+}
+
+verify_deb() {
+  local package="$1"
+  local expected_arch="$2"
+  local package_version
+  command -v dpkg-deb >/dev/null || {
+    printf 'dpkg-deb is required to validate %s\n' "$package" >&2
+    exit 1
+  }
+  [[ "$(dpkg-deb -f "$package" Package)" == media-studio ]]
+  package_version="$(dpkg-deb -f "$package" Version)"
+  [[ "$package_version" == "$expected_version" || "$package_version" == "$expected_version-"* ]]
+  [[ "$(dpkg-deb -f "$package" Architecture)" == "$expected_arch" ]]
+}
+
+verify_rpm() {
+  local package="$1"
+  local expected_arch="$2"
+  local package_version
+  command -v rpm >/dev/null || {
+    printf 'rpm is required to validate %s\n' "$package" >&2
+    exit 1
+  }
+  [[ "$(rpm -qp --queryformat '%{NAME}' "$package")" == media-studio ]]
+  package_version="$(rpm -qp --queryformat '%{VERSION}' "$package")"
+  [[ "$package_version" == "$expected_version" ]]
+  [[ "$(rpm -qp --queryformat '%{ARCH}' "$package")" == "$expected_arch" ]]
+}
+
+verify_tarball() {
+  local tarball="$1"
+  local binary="$2"
+  local archive_sha binary_sha
+  [[ -s "$tarball" ]]
+  tar -tzf "$tarball" | grep -Fx "$binary" >/dev/null
+  archive_sha="$(tar -xOf "$tarball" "$binary" | sha256sum | awk '{ print $1 }')"
+  binary_sha="$(awk 'NR == 1 { print $1; exit }' "$assets_dir/$binary.sha256")"
+  [[ "$archive_sha" == "$binary_sha" ]]
+}
+
 verify_media_output() {
   local output="$1"
   local label="$2"
@@ -38,6 +103,23 @@ for arch in x86_64 aarch64; do
   test -s "$assets_dir/$binary"
   test -s "$assets_dir/$binary.sha256"
   (cd "$assets_dir" && sha256sum -c "$binary.sha256")
+  verify_tarball "$assets_dir/$binary.tar.gz" "$binary"
+  case "$arch" in
+    x86_64)
+      deb_arch=amd64
+      rpm_arch=x86_64
+      ;;
+    aarch64)
+      deb_arch=arm64
+      rpm_arch=aarch64
+      ;;
+  esac
+  deb_package="$(single_asset "media-studio_*_${deb_arch}.deb" "$arch Debian package")"
+  rpm_package="$(single_asset "media-studio-*.${rpm_arch}.rpm" "$arch RPM package")"
+  test -s "$deb_package"
+  test -s "$rpm_package"
+  verify_deb "$deb_package" "$deb_arch"
+  verify_rpm "$rpm_package" "$rpm_arch"
 done
 
 for bundle in media-studio-sandbox.flatpak media-studio-host-integration.flatpak; do
@@ -59,6 +141,7 @@ for backend in vaapi nvenc; do
   grep -Fx "backend=$backend" "$receipt"
   grep -Fx "encoder=h264_$backend" "$receipt"
   grep -Eq '^runner=[^[:space:]]+$' "$receipt"
+  grep -Fx 'RESULT=verified' "$job_log"
   backend_label="$(printf '%s' "$backend" | tr '[:lower:]' '[:upper:]')"
   encoder="h264_$backend"
   grep -Fx "HARDWARE_USED=$backend_label ENCODER=$encoder" "$job_log"

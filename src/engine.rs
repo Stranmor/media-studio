@@ -486,10 +486,10 @@ fn probe_duration(input: &Path) -> Result<f64> {
     if !output.status.success() {
         bail!("ffprobe не смог определить длительность");
     }
-    String::from_utf8_lossy(&output.stdout)
-        .trim()
-        .parse::<f64>()
-        .context("ffprobe вернул некорректную длительность")
+    parse_positive_duration(
+        String::from_utf8_lossy(&output.stdout).trim(),
+        "ffprobe вернул некорректную длительность",
+    )
 }
 
 fn run_magick(
@@ -533,17 +533,21 @@ fn verify(profile: &Profile, output: &Path, log: &mut File) -> Result<()> {
                     "-v",
                     "error",
                     "-show_entries",
-                    "format=duration,size",
+                    "format=duration",
                     "-of",
-                    "default=noprint_wrappers=1",
+                    "default=noprint_wrappers=1:nokey=1",
                 ])
                 .arg(output)
                 .output()
                 .context("не удалось запустить ffprobe для проверки")?;
             log.write_all(&probe.stderr)?;
-            if !probe.status.success() || String::from_utf8_lossy(&probe.stdout).trim().is_empty() {
+            if !probe.status.success() {
                 bail!("ffprobe не подтвердил результат: {}", output.display());
             }
+            parse_positive_duration(
+                String::from_utf8_lossy(&probe.stdout).trim(),
+                "ffprobe вернул некорректную положительную длительность",
+            )?;
             let decode = Command::new(runtime::required("ffmpeg")?)
                 .args([
                     "-hide_banner",
@@ -576,6 +580,15 @@ fn verify(profile: &Profile, output: &Path, log: &mut File) -> Result<()> {
         _ => bail!("нельзя проверить неизвестный engine"),
     }
     Ok(())
+}
+
+fn parse_positive_duration(value: &str, message: &str) -> Result<f64> {
+    let duration = value.parse::<f64>().context(message.to_owned())?;
+    anyhow::ensure!(
+        duration.is_finite() && duration > 0.0,
+        "{message}: {value}"
+    );
+    Ok(duration)
 }
 
 pub fn inspect(input: &Path, json: bool) -> Result<String> {
@@ -687,5 +700,14 @@ mod tests {
             .windows(2)
             .any(|pair| pair == ["-bufsize", "1800k"]));
         assert!(fallback.windows(2).any(|pair| pair == ["-b:a", "128k"]));
+    }
+
+    #[test]
+    fn positive_duration_requires_finite_nonzero_value() {
+        assert_eq!(parse_positive_duration("1.25", "duration").unwrap(), 1.25);
+        assert!(parse_positive_duration("0", "duration").is_err());
+        assert!(parse_positive_duration("-1", "duration").is_err());
+        assert!(parse_positive_duration("NaN", "duration").is_err());
+        assert!(parse_positive_duration("inf", "duration").is_err());
     }
 }

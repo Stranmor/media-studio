@@ -2,7 +2,8 @@
 
 The tag release workflow publishes only after all three independent gates pass:
 
-1. native Rust and distro-package builds for x86_64 and aarch64;
+1. native Rust and distro-package builds for x86_64 and aarch64, plus a real
+   Arch package build from the exact release tag;
 2. strict-sandbox and experimental host-integration Flatpak builds, each with
    an installed-bundle version/profile check and a real media conversion;
 3. VAAPI and NVENC matrix conversions on trusted self-hosted runners with
@@ -19,6 +20,11 @@ native checksums, Flatpak receipts, hardware markers, or verified-result logs
 fail the publish job. The verifier also re-runs FFprobe positive-duration and
 full-decode checks for every downloaded media output, validates the expected
 Flatpak app IDs, and checks exact hardware encoder fields.
+
+The native gate also validates each x86_64 and aarch64 tarball against its
+binary checksum and inspects the matching Debian and RPM package metadata
+(name, version, and architecture) before publication. The public gate receipt is
+copied from this verifier rather than asserting passed values independently.
 
 The hosted host-integration smoke records `tool_mode=runtime-fallback` because
 the privileged build container has no desktop Flatpak session helper; the

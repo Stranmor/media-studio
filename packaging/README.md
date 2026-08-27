@@ -45,9 +45,14 @@ Flatpak session helper; normal desktop launches keep the default host-tool
 delegation through `flatpak-spawn --host`.
 
 `media-studio install` requires FFmpeg/FFprobe and user-systemd. KDE cache
-builders and `zenity`/`kdialog` are optional helpers: without them the menus
-are still installed, the cache update is reported as unavailable, and the
-advanced action reports the missing dialog backend when invoked.
+builders and `zenity`/`kdialog` are optional helpers: Media Studio probes the
+actual command (including Flatpak host wrappers), keeps installation successful
+when a helper is absent or fails, and reports the cache/dialog capability as
+unavailable instead of treating a wrapper path as proof of host availability.
+
+`provision-runner.sh --replace` acquires a per-runner provisioning lock and
+refuses to mutate a runner directory while its user service or Runner.Listener
+process is active. Stop the service first, then rerun the explicit replacement.
 
 ## GPU runners
 

@@ -28,7 +28,7 @@ pub fn notify(title: &str, body: &str) {
             return;
         }
     }
-    if let Some(kdialog) = runtime::optional("kdialog") {
+    if let Some(kdialog) = runtime::optional_usable("kdialog") {
         let _ = Command::new(kdialog)
             .args(["--title", title, "--passivepopup", body, "5"])
             .stdout(Stdio::null())
@@ -43,8 +43,11 @@ pub fn error(title: &str, body: &str) {
 }
 
 pub fn choose_advanced(config: &Config) -> Result<AdvancedSelection> {
-    if runtime::optional("zenity").is_some() {
+    if runtime::optional_usable("zenity").is_some() {
         return choose_with_zenity(config);
+    }
+    if runtime::optional_usable("kdialog").is_none() {
+        bail!("не найден рабочий dialog backend: установите zenity или kdialog");
     }
     choose_with_kdialog(config)
 }
@@ -201,11 +204,11 @@ fn kdialog_yesno(prompt: &str) -> Result<bool> {
 }
 
 pub fn show_info(title: &str, body: &str) {
-    if let Some(zenity) = runtime::optional("zenity") {
+    if let Some(zenity) = runtime::optional_usable("zenity") {
         let _ = Command::new(zenity)
             .args(["--info", "--title", title, "--text", body, "--width", "760"])
             .status();
-    } else if let Some(kdialog) = runtime::optional("kdialog") {
+    } else if let Some(kdialog) = runtime::optional_usable("kdialog") {
         let _ = Command::new(kdialog)
             .args(["--title", title, "--msgbox", body])
             .status();

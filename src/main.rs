@@ -780,14 +780,28 @@ fn doctor() -> Result<()> {
             }
         }
     }
-    match kde_cache_builder() {
-        Some(path) => println!("kde_cache_builder: OK ({})", path.display()),
-        None => println!("kde_cache_builder: OPTIONAL-MISSING (kbuildsycoca6 or kbuildsycoca5)"),
+    match kde_cache_probe() {
+        runtime::OptionalStatus::Available(path) => {
+            println!("kde_cache_builder: OK ({})", path.display())
+        }
+        runtime::OptionalStatus::Unavailable(path) => println!(
+            "kde_cache_builder: OPTIONAL-UNAVAILABLE ({})",
+            path.display()
+        ),
+        runtime::OptionalStatus::Missing => {
+            println!("kde_cache_builder: OPTIONAL-MISSING (kbuildsycoca6 or kbuildsycoca5)")
+        }
     }
-    let dialog_backend = find_on_path("zenity").or_else(|| find_on_path("kdialog"));
-    match dialog_backend {
-        Some(path) => println!("dialog_backend: OK ({})", path.display()),
-        None => println!("dialog_backend: OPTIONAL-MISSING (zenity or kdialog)"),
+    match dialog_probe() {
+        runtime::OptionalStatus::Available(path) => {
+            println!("dialog_backend: OK ({})", path.display())
+        }
+        runtime::OptionalStatus::Unavailable(path) => {
+            println!("dialog_backend: OPTIONAL-UNAVAILABLE ({})", path.display())
+        }
+        runtime::OptionalStatus::Missing => {
+            println!("dialog_backend: OPTIONAL-MISSING (zenity or kdialog)")
+        }
     }
     for tool in ["magick", "notify-send"] {
         match find_on_path(tool) {
@@ -851,8 +865,13 @@ fn install(force_config: bool) -> Result<()> {
             install_watch_unit(&config, folder)?;
         }
     }
-    let cache =
-        kde_cache_builder().map(|builder| Command::new(builder).arg("--noincremental").status());
+    let cache_probe = kde_cache_probe();
+    let cache = match &cache_probe {
+        runtime::OptionalStatus::Available(builder) => {
+            Some(Command::new(builder).arg("--noincremental").status())
+        }
+        runtime::OptionalStatus::Missing | runtime::OptionalStatus::Unavailable(_) => None,
+    };
     println!("installed_binary={}", target.display());
     println!("config={}", config_path.display());
     println!(
@@ -866,15 +885,28 @@ fn install(force_config: bool) -> Result<()> {
     let cache_state = match cache {
         Some(Ok(status)) if status.success() => "updated",
         Some(Ok(status)) => {
-            return Err(anyhow::anyhow!(
-                "KDE cache builder завершился с кодом {status}"
-            ));
-        }
-        Some(Err(error)) => return Err(error.into()),
-        None => {
             eprintln!(
-                "предупреждение: kbuildsycoca6/kbuildsycoca5 не найдены; KDE cache обновит система"
+                "предупреждение: KDE cache builder завершился с кодом {status}; меню установлены, cache обновит система"
             );
+            "not-available"
+        }
+        Some(Err(error)) => {
+            eprintln!(
+                "предупреждение: не удалось запустить KDE cache builder ({error}); меню установлены, cache обновит система"
+            );
+            "not-available"
+        }
+        None => {
+            match cache_probe {
+                runtime::OptionalStatus::Unavailable(path) => eprintln!(
+                    "предупреждение: KDE cache builder недоступен ({}) после capability probe; cache обновит система",
+                    path.display()
+                ),
+                runtime::OptionalStatus::Missing => eprintln!(
+                    "предупреждение: kbuildsycoca6/kbuildsycoca5 не найдены; KDE cache обновит система"
+                ),
+                runtime::OptionalStatus::Available(_) => unreachable!("cache probe drifted"),
+            }
             "not-available"
         }
     };
@@ -1315,7 +1347,18 @@ fn find_on_path(name: &str) -> Option<PathBuf> {
 }
 
 fn kde_cache_builder() -> Option<PathBuf> {
-    runtime::optional("kbuildsycoca6").or_else(|| runtime::optional("kbuildsycoca5"))
+    match kde_cache_probe() {
+        runtime::OptionalStatus::Available(path) => Some(path),
+        runtime::OptionalStatus::Missing | runtime::OptionalStatus::Unavailable(_) => None,
+    }
+}
+
+fn kde_cache_probe() -> runtime::OptionalStatus {
+    runtime::probe_first(&["kbuildsycoca6", "kbuildsycoca5"])
+}
+
+fn dialog_probe() -> runtime::OptionalStatus {
+    runtime::probe_first(&["zenity", "kdialog"])
 }
 
 fn required_command(name: &str) -> Result<Command> {

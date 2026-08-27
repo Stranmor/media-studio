@@ -77,6 +77,7 @@ fi
 runner_dir=${runner_dir:-"$HOME/.local/share/media-studio/actions-runner-$backend"}
 runner_name=${runner_name:-"media-studio-$backend-$(hostname -s)"}
 runner_user="$(id -un)"
+unit_name="media-studio-actions-runner-$backend.service"
 if [[ "$runner_user" == root || "$(id -u)" -eq 0 ]]; then
   printf 'run provisioning as the target non-root user so its user service and linger state are owned correctly\n' >&2
   exit 2
@@ -129,6 +130,14 @@ if [[ -L "$runner_dir" ]]; then
   printf 'refusing a symlinked runner directory: %s\n' "$runner_dir" >&2
   exit 2
 fi
+runner_parent="${runner_dir%/*}"
+[[ -n "$runner_parent" ]] || runner_parent=/
+provision_lock_path="${runner_dir}.provision.lock"
+validate_path_components "$provision_lock_path" "provisioning lock"
+if [[ -L "$provision_lock_path" ]]; then
+  printf 'refusing a symlinked provisioning lock path: %s\n' "$provision_lock_path" >&2
+  exit 2
+fi
 
 validate_runner_symlinks() {
   local root="$1"
@@ -156,7 +165,7 @@ validate_unit_field() {
   }
 }
 
-for tool in bash curl tar sha256sum ffmpeg ffprobe systemd-run systemctl cargo rustc cc flock; do
+for tool in bash curl tar sha256sum ffmpeg ffprobe systemd-run systemctl cargo rustc cc flock ps; do
   command -v "$tool" >/dev/null || {
     printf 'missing required tool: %s\n' "$tool" >&2
     exit 1
@@ -206,6 +215,36 @@ fi
 if [[ -z "${registration_token:-}" ]]; then
   printf 'a one-time registration token is required via --token-stdin or RUNNER_REGISTRATION_TOKEN\n' >&2
   exit 2
+fi
+
+mkdir -p -- "$runner_parent"
+validate_path_components "$runner_dir" "runner directory"
+validate_path_components "$provision_lock_path" "provisioning lock"
+exec {provision_lock_fd}>"$provision_lock_path"
+chmod 600 "$provision_lock_path"
+if ! flock -n "$provision_lock_fd"; then
+  printf 'another provisioning operation already owns %s\n' "$provision_lock_path" >&2
+  exit 1
+fi
+
+service_state="$(systemctl --user is-active "$unit_name" 2>/dev/null || true)"
+case "$service_state" in
+  active|activating|deactivating)
+    printf 'runner service %s is %s; stop it before using --replace\n' "$unit_name" "$service_state" >&2
+    exit 1
+    ;;
+esac
+
+active_runner_pids="$(ps -eo pid=,args= | awk -v dir="$runner_dir" -v self="$$" '
+  $1 != self && index($0, dir "/") &&
+    ($0 ~ /\/run\.sh([[:space:]]|$)/ || $0 ~ /\/Runner\.Listener([[:space:]]|$)/) {
+      printf "%s ", $1
+    }
+')"
+if [[ -n "$active_runner_pids" ]]; then
+  printf 'runner processes are still using %s: %s; refusing to mutate the directory\n' \
+    "$runner_dir" "$active_runner_pids" >&2
+  exit 1
 fi
 
 mkdir -p "$runner_dir"
@@ -384,7 +423,6 @@ fi
 runner_path="$(dirname "$cargo_bin"):$(dirname "$rustc_bin"):$PATH"
 runner_path="$(dirname "$cc_bin"):$runner_path"
 unit_dir="$HOME/.config/systemd/user"
-unit_name="media-studio-actions-runner-$backend.service"
 unit_path="$unit_dir/$unit_name"
 lock_path="$runner_dir/.runner.lock"
 flock_bin="$(command -v flock)"

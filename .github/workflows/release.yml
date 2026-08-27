@@ -53,7 +53,7 @@ jobs:
           path: release-assets/*
 
   publish:
-    needs: [build, native-ci, flatpak, hardware]
+    needs: [build, arch-package, native-ci, flatpak, hardware]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@main
@@ -104,8 +104,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes ffmpeg rpm
           command -v ffmpeg
           command -v ffprobe
+          command -v dpkg-deb
+          command -v rpm
           ffmpeg -version | head -n1
           ffprobe -version | head -n1
       - name: Verify every release gate receipt
@@ -115,8 +119,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          printf 'schema_version=1\nflatpak_gate=verified\nhardware_gate=verified\nref=%s\n' \
-            '${{ github.ref }}' > release-assets/release-gates.txt
+          test -s release-gates/release-gates.txt
+          cp release-gates/release-gates.txt release-assets/release-gates.txt
+          printf 'ref=%s\n' '${{ github.ref }}' >> release-assets/release-gates.txt
       - uses: softprops/action-gh-release@master
         with:
           files: |
@@ -145,3 +150,27 @@ jobs:
     with:
       checkout_ref: ${{ github.ref }}
     secrets: inherit
+
+  arch-package:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@main
+      - name: Build Arch package in the current Arch image
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -v "$GITHUB_WORKSPACE:/workspace" \
+            -w /workspace \
+            archlinux:latest \
+            bash -euo pipefail -c '
+              pacman -Sy --noconfirm --needed base-devel git rust cargo ffmpeg kio systemd
+              useradd --create-home builder
+              chown -R builder:builder /workspace
+              runuser -u builder -- bash -euo pipefail -c "
+                cd /workspace/packaging/arch
+                makepkg --noconfirm --syncdeps --cleanbuild
+              "
+            '
