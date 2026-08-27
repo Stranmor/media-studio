@@ -31,6 +31,15 @@ jobs:
           sudo apt-get install --yes appstream desktop-file-utils imagemagick ruby
       - name: Verify Flathub submission contract
         run: packaging/flathub/verify-submission.sh
+      - name: Verify top-level submission export
+        shell: bash
+        run: |
+          set -euo pipefail
+          export_dir="$(mktemp -d)"
+          packaging/flathub/export-submission.sh "$export_dir"
+          test -s "$export_dir/io.github.stranmor.MediaStudio.yml"
+          test -s "$export_dir/cargo-sources.json"
+          test "$(find "$export_dir" -maxdepth 1 -type f | wc -l)" -eq 2
 
   build-and-smoke:
     name: strict-sandbox-build

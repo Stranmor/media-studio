@@ -26,6 +26,13 @@ run:
 packaging/flathub/verify-submission.sh
 ```
 
+The Flathub repository requires its manifest at the submission root. Export the
+canonical two-file submission tree without duplicating the source of truth:
+
+```bash
+packaging/flathub/export-submission.sh /tmp/media-studio-flathub-submission
+```
+
 The preflight checks the app ID, immutable source identity, strict permissions,
 metadata, icon dimensions, license, and generated source closure. It reports a
 technical pass separately from the unresolved Flathub policy gate. The actual
