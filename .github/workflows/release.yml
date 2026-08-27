@@ -189,7 +189,7 @@ jobs:
             find . -maxdepth 1 -type f \
               \( -name 'media-studio-linux-x86_64' -o -name 'media-studio-linux-aarch64' \
               -o -name 'media-studio-linux-*.tar.gz' -o -name '*.deb' -o -name '*.rpm' -o -name '*.flatpak' \) \
-              -printf '%f\\0' | sort -z | xargs -0 sha256sum --
+              -printf '%f\0' | sort -z | xargs -0 sha256sum --
           ) > release-assets/build-subjects.sha256
           (
             cd release-assets
@@ -197,7 +197,7 @@ jobs:
               ! -name 'release-assets.sha256' \
               ! -name '*.provenance.json' \
               ! -name '*.attestation.json' \
-              -printf '%f\\0' | sort -z | xargs -0 sha256sum --
+              -printf '%f\0' | sort -z | xargs -0 sha256sum --
           ) > release-assets/release-assets.sha256
           test -s release-assets/build-subjects.sha256
           test -s release-assets/release-assets.sha256

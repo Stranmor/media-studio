@@ -69,11 +69,20 @@ jobs:
           set -eu
           flatpak --version
           flatpak-builder --version
+      - name: Install Flathub SDK and runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+          flatpak remote-add --if-not-exists --user flathub https://flathub.org/repo/flathub.flatpakrepo
+          flatpak install --user --noninteractive flathub \
+            org.freedesktop.Sdk//25.08 \
+            org.freedesktop.Platform//25.08 \
+            org.freedesktop.Sdk.Extension.rust-stable//25.08
       - name: Build strict Flathub bundle
         shell: bash
         run: |
           set -euo pipefail
-          flatpak-builder --force-clean --disable-rofiles-fuse \
+          flatpak-builder --install-deps-from=flathub --force-clean --disable-rofiles-fuse \
             --repo=repo build-dir packaging/flathub/io.github.stranmor.MediaStudio.yml
           flatpak build-bundle repo "media-studio-flathub-${GITHUB_SHA}.flatpak" io.github.stranmor.MediaStudio
           test -s "media-studio-flathub-${GITHUB_SHA}.flatpak"
