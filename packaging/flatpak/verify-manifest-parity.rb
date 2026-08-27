@@ -40,7 +40,7 @@ if kind == "sandbox"
   abort "sandbox must create app bin directory" unless commands.include?("install -d /app/bin")
   abort "sandbox must expose runtime ffmpeg" unless commands.include?("ln -srv /usr/bin/ffmpeg /app/bin/ffmpeg")
   abort "sandbox must expose runtime ffprobe" unless commands.include?("ln -srv /usr/bin/ffprobe /app/bin/ffprobe")
-  abort "sandbox desktop must be explicitly sandboxed" unless File.read("packaging/flatpak/io.github.stranmor.MediaStudio.desktop").include?("Media Studio Sandbox")
+  abort "sandbox desktop must be explicitly sandboxed" unless File.read("packaging/flatpak/io.github.stranmor.MediaStudio.desktop").include?("Comment=Convert media with verified profiles")
 else
   expected_finish_args = [
     "--share=ipc",

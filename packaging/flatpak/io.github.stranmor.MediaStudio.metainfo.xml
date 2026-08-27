@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.stranmor.MediaStudio</id>
+  <name>Media Studio</name>
+  <summary>Local media conversion studio for KDE Dolphin</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <developer id="io.github.stranmor">
+    <name>Stranmor</name>
+  </developer>
+  <description>
+    <p>
+      Media Studio converts video, audio, and image files with reproducible
+      profiles and verified output receipts. The standalone Flatpak keeps
+      conversion data inside the sandbox and provides a terminal workflow for
+      file-based media jobs.
+    </p>
+    <p>
+      Native installation adds KDE Dolphin service menus and user-systemd
+      watch-folders. Those host integrations are intentionally not part of the
+      strict sandbox package.
+    </p>
+    <ul>
+      <li>Video, audio, image, remux, and target-size profiles</li>
+      <li>FFmpeg and FFprobe verification with full decode checks</li>
+      <li>Optional VAAPI and NVENC profiles when the host exposes the encoder</li>
+      <li>Atomic outputs, checksums, job state, and failure diagnostics</li>
+    </ul>
+  </description>
+  <url type="homepage">https://github.com/Stranmor/media-studio</url>
+  <url type="bugtracker">https://github.com/Stranmor/media-studio/issues</url>
+  <url type="vcs-browser">https://github.com/Stranmor/media-studio</url>
+  <launchable type="desktop-id">io.github.stranmor.MediaStudio.desktop</launchable>
+  <provides>
+    <binary>media-studio</binary>
+  </provides>
+  <categories>
+    <category>AudioVideo</category>
+    <category>Utility</category>
+  </categories>
+  <keywords>
+    <keyword>FFmpeg</keyword>
+    <keyword>converter</keyword>
+    <keyword>transcoder</keyword>
+    <keyword>video</keyword>
+    <keyword>audio</keyword>
+    <keyword>image</keyword>
+  </keywords>
+  <content_rating type="oars-1.1"/>
+  <releases>
+    <release version="0.2.5" date="2026-08-27">
+      <description>
+        <p>Added standalone sandbox metadata, offline build inputs, and signed build provenance.</p>
+      </description>
+    </release>
+  </releases>
+</component>

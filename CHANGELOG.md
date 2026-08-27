@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.5] - 2026-08-27
+
+### Added
+
+- Flathub submission bundle with AppStream metadata, icon assets, and an offline Cargo source closure.
+- Release artifact attestations, SPDX SBOM publication, and local verification helpers for signed provenance.
+
+### Changed
+
+- Strict Flatpak metadata now declares the standalone sandbox boundary and installs the canonical application metadata.
+- Native Dolphin/host integration remains explicitly outside the strict Flathub sandbox profile.
+
 ## [0.2.2] - 2026-08-26
 
 ### Added

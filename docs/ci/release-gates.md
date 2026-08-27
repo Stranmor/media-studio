@@ -44,3 +44,8 @@ and rejects a checkout that is not exactly that tag and commit. The release
 workflow independently verifies that the remote tag resolves to `github.sha`;
 Debian and RPM metadata declare the FFmpeg and systemd runtime prerequisites
 used by the installer.
+
+After the gates pass, the publish job generates a keyless Sigstore SLSA
+provenance bundle and an SPDX SBOM attestation. Both are attached to the
+release together with `release-assets.sha256`; the latter is the immutable
+subject index consumed by `packaging/release/verify-attestations.sh`.

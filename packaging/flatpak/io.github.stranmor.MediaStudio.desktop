@@ -1,8 +1,13 @@
 [Desktop Entry]
 Type=Application
-Name=Media Studio Sandbox
-Comment=Standalone sandboxed media conversion
-Exec=media-studio --version
+Name=Media Studio
+GenericName=Media Converter
+Comment=Convert media with verified profiles
+Exec=media-studio --help
+TryExec=media-studio
+Icon=io.github.stranmor.MediaStudio
 Terminal=true
 NoDisplay=true
-Categories=AudioVideo;Utility;
+Categories=AudioVideo;
+Keywords=converter;transcoder;video;audio;image;FFmpeg;
+StartupNotify=false

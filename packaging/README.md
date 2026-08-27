@@ -72,3 +72,27 @@ fallback and is cleared immediately after read. The PTY handshake records a
 redacted marker transcript, accepts the supported registration-token prompt
 variants, requires a zero child exit, and verifies regular `.runner` and
 `.credentials` state files before enabling the service.
+
+## Release attestations
+
+The release publish job creates two keyless Sigstore bundles after every gate
+has passed:
+
+- `media-studio.provenance.json` contains SLSA build provenance for the release
+  asset set;
+- `media-studio.sbom.attestation.json` binds the SPDX SBOM to the native,
+  package, and Flatpak build subjects.
+
+`release-assets.sha256` is the canonical integrity index for the published
+payloads. Verify the online GitHub attestations and local checksums with:
+
+```bash
+packaging/release/verify-attestations.sh \
+  release-assets \
+  Stranmor/media-studio \
+  refs/tags/v0.2.5 \
+  RELEASE_COMMIT_SHA
+```
+
+The verifier is fail-closed: missing attestations, unexpected subjects, a
+source-ref mismatch, or an invalid SBOM predicate is a release failure.

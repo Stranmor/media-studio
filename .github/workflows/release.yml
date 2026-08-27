@@ -5,7 +5,7 @@ on:
     tags: ["v*"]
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: media-studio-release-${{ github.ref }}
@@ -65,6 +65,12 @@ jobs:
     needs: [build, arch-package, native-ci, flatpak, hardware]
     if: ${{ always() }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      actions: read
+      id-token: write
+      attestations: write
+      artifact-metadata: write
     steps:
       - name: Require every release gate to succeed
         shell: bash
@@ -160,6 +166,72 @@ jobs:
           test -s release-gates/release-gates.txt
           cp release-gates/release-gates.txt release-assets/release-gates.txt
           printf 'ref=%s\nsha=%s\n' '${{ github.ref }}' '${{ github.sha }}' >> release-assets/release-gates.txt
+      - name: Prepare SPDX output directory
+        shell: bash
+        run: mkdir -p sbom
+      - name: Generate SPDX release SBOM
+        uses: anchore/sbom-action@main
+        with:
+          path: release-assets
+          format: spdx-json
+          output-file: sbom/media-studio.spdx.json
+          artifact-name: media-studio-${{ github.ref_name }}.spdx.json
+          upload-artifact: false
+          upload-release-assets: false
+      - name: Prepare attestation subject manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -s sbom/media-studio.spdx.json
+          install -Dm644 sbom/media-studio.spdx.json release-assets/media-studio.spdx.json
+          (
+            cd release-assets
+            find . -maxdepth 1 -type f \
+              \( -name 'media-studio-linux-x86_64' -o -name 'media-studio-linux-aarch64' \
+              -o -name 'media-studio-linux-*.tar.gz' -o -name '*.deb' -o -name '*.rpm' -o -name '*.flatpak' \) \
+              -printf '%f\\0' | sort -z | xargs -0 sha256sum --
+          ) > release-assets/build-subjects.sha256
+          (
+            cd release-assets
+            find . -maxdepth 1 -type f \
+              ! -name 'release-assets.sha256' \
+              ! -name '*.provenance.json' \
+              ! -name '*.attestation.json' \
+              -printf '%f\\0' | sort -z | xargs -0 sha256sum --
+          ) > release-assets/release-assets.sha256
+          test -s release-assets/build-subjects.sha256
+          test -s release-assets/release-assets.sha256
+          (cd release-assets && sha256sum --check build-subjects.sha256)
+          (cd release-assets && sha256sum --check release-assets.sha256)
+      - name: Generate SLSA provenance attestation
+        id: provenance
+        uses: actions/attest@main
+        with:
+          subject-checksums: release-assets/release-assets.sha256
+          show-summary: true
+      - name: Preserve SLSA provenance bundle
+        shell: bash
+        env:
+          BUNDLE_PATH: ${{ steps.provenance.outputs.bundle-path }}
+        run: |
+          set -euo pipefail
+          test -s "$BUNDLE_PATH"
+          install -Dm644 "$BUNDLE_PATH" release-assets/media-studio.provenance.json
+      - name: Generate SPDX SBOM attestation
+        id: sbom_attestation
+        uses: actions/attest@main
+        with:
+          subject-checksums: release-assets/build-subjects.sha256
+          sbom-path: release-assets/media-studio.spdx.json
+          show-summary: true
+      - name: Preserve SPDX attestation bundle
+        shell: bash
+        env:
+          BUNDLE_PATH: ${{ steps.sbom_attestation.outputs.bundle-path }}
+        run: |
+          set -euo pipefail
+          test -s "$BUNDLE_PATH"
+          install -Dm644 "$BUNDLE_PATH" release-assets/media-studio.sbom.attestation.json
       - uses: softprops/action-gh-release@master
         with:
           files: |
@@ -168,6 +240,10 @@ jobs:
             release-assets/*.rpm
             release-assets/*.flatpak
             release-assets/*.flatpak.source-sha
+            release-assets/*.spdx.json
+            release-assets/*.sha256
+            release-assets/*.provenance.json
+            release-assets/*.attestation.json
             release-assets/release-gates.txt
 
   flatpak:

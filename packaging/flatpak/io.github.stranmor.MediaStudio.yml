@@ -44,3 +44,7 @@ modules:
       - ln -srv /usr/bin/ffprobe /app/bin/ffprobe
       - install -Dm755 target/release/media-studio /app/bin/media-studio
       - install -Dm644 packaging/flatpak/io.github.stranmor.MediaStudio.desktop /app/share/applications/io.github.stranmor.MediaStudio.desktop
+      - install -Dm644 packaging/flatpak/io.github.stranmor.MediaStudio.metainfo.xml /app/share/metainfo/io.github.stranmor.MediaStudio.metainfo.xml
+      - install -Dm644 packaging/flatpak/icons/hicolor/128x128/apps/io.github.stranmor.MediaStudio.png /app/share/icons/hicolor/128x128/apps/io.github.stranmor.MediaStudio.png
+      - install -Dm644 packaging/flatpak/icons/hicolor/256x256/apps/io.github.stranmor.MediaStudio.png /app/share/icons/hicolor/256x256/apps/io.github.stranmor.MediaStudio.png
+      - install -Dm644 LICENSE /app/share/licenses/io.github.stranmor.MediaStudio/LICENSE
