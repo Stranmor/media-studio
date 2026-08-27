@@ -401,33 +401,72 @@ configure_with_token_pty() {
   local runner_url="$3"
   local configured_name="$4"
   local configured_labels="$5"
+  local handshake_path="$runner_root/runner-provisioning.txt"
+  local handshake_fd
   local config_status
+  if [[ -L "$handshake_path" ]]; then
+    printf 'refusing a symlinked provisioning transcript: %s\n' "$handshake_path" >&2
+    exit 2
+  fi
+  : > "$handshake_path"
+  chmod 600 "$handshake_path"
+  exec {handshake_fd}>"$handshake_path"
   exec 3<<<"$registration_token"
   unset registration_token
   if (
     cd "$runner_root"
-    env "${config_env[@]}" expect - "$runner_shell" "$runner_url" "$configured_name" "$configured_labels" <<'EXPECT_SCRIPT'
+    env "${config_env[@]}" expect - "$runner_shell" "$runner_url" "$configured_name" "$configured_labels" "$handshake_fd" <<'EXPECT_SCRIPT'
 set timeout 180
 log_user 0
 set runner_shell [lindex $argv 0]
 set runner_url [lindex $argv 1]
 set runner_name [lindex $argv 2]
 set runner_labels [lindex $argv 3]
+set handshake_fd [lindex $argv 4]
+set handshake_channel [open "/proc/self/fd/$handshake_fd" w]
+proc mark {channel key value} {
+    puts $channel "$key=$value"
+    flush $channel
+}
+mark $handshake_channel pty_spawned yes
 set token_channel [open "/proc/self/fd/3" r]
 set token [string trim [read $token_channel]]
 close $token_channel
 spawn -noecho $runner_shell ./config.sh --url $runner_url --name $runner_name --labels $runner_labels --work _work --replace
+set prompt_seen 0
+set token_sent 0
 expect {
-    -re {What is your runner register token\?} {
+    -re {(?i)(what is your runner (register|registration) token\?|enter (the )?runner (register|registration) token|runner (register|registration) token|registration token)} {
+        set prompt_seen 1
+        mark $handshake_channel token_prompt_seen yes
         send -- "$token\r"
+        set token_sent 1
+        mark $handshake_channel token_sent yes
         exp_continue
     }
-    eof {}
-    timeout { catch { close }; catch { wait }; exit 124 }
+    -re {(?i)(invalid|unauthori[sz]ed|registration failed|configuration failed|error)} {
+        mark $handshake_channel child_error yes
+        catch { close }
+        catch { wait }
+        exit 1
+    }
+    eof { mark $handshake_channel child_eof yes }
+    timeout {
+        mark $handshake_channel timeout yes
+        catch { close }
+        catch { wait }
+        exit 124
+    }
 }
 set result [wait]
 set exit_code [lindex $result 3]
+mark $handshake_channel child_exit $exit_code
 if {$exit_code eq ""} { exit 1 }
+if {$prompt_seen == 0 || $token_sent == 0 || $exit_code != 0} {
+    mark $handshake_channel registration_confirmed no
+    exit 125
+}
+mark $handshake_channel registration_confirmed yes
 exit $exit_code
 EXPECT_SCRIPT
   ); then
@@ -436,6 +475,20 @@ EXPECT_SCRIPT
     config_status=$?
   fi
   exec 3<&-
+  exec {handshake_fd}>&-
+  if (( config_status != 0 )); then
+    return "$config_status"
+  fi
+  grep -Fx 'registration_confirmed=yes' "$handshake_path" >/dev/null
+  grep -Fx 'token_prompt_seen=yes' "$handshake_path" >/dev/null
+  grep -Fx 'token_sent=yes' "$handshake_path" >/dev/null
+  grep -Fx 'child_exit=0' "$handshake_path" >/dev/null
+  for registration_state in .runner .credentials; do
+    [[ ! -L "$runner_root/$registration_state" && -s "$runner_root/$registration_state" ]] || {
+      printf 'runner registration did not produce a regular %s file\n' "$registration_state" >&2
+      return 125
+    }
+  done
   return "$config_status"
 }
 
@@ -546,6 +599,7 @@ hardware_detail=""
 if [[ "$backend" = nvenc ]]; then
   hardware_detail="$(nvidia-smi --query-gpu=name --format=csv,noheader | sed -n '1p')"
 fi
-printf 'schema_version=1\nrepo=%s\nrunner_name=%s\nbackend=%s\nrunner_version=%s\narchive_sha256=%s\nhost=%s\nkernel=%s\nhardware=%s\nservice=%s\nuser=%s\nlinger=%s\nlabels=self-hosted,linux,gpu,%s\n' \
-  "$repo" "$runner_name" "$backend" "$runner_version" "$actual_digest" "$(hostname)" "$(uname -sr)" "$hardware_detail" "$unit_name" "$runner_user" "$linger_state" "$backend" > "$receipt_path"
+handshake_sha256="$(sha256sum -- "$runner_dir/runner-provisioning.txt" | awk '{print $1}')"
+printf 'schema_version=1\nrepo=%s\nrunner_name=%s\nbackend=%s\nrunner_version=%s\narchive_sha256=%s\nhost=%s\nkernel=%s\nhardware=%s\nservice=%s\nuser=%s\nlinger=%s\nlabels=self-hosted,linux,gpu,%s\nregistration_handshake=pty\nregistration_confirmed=yes\nprovisioning_transcript_sha256=%s\n' \
+  "$repo" "$runner_name" "$backend" "$runner_version" "$actual_digest" "$(hostname)" "$(uname -sr)" "$hardware_detail" "$unit_name" "$runner_user" "$linger_state" "$backend" "$handshake_sha256" > "$receipt_path"
 printf 'runner configured and active: %s (%s)\n' "$runner_name" "$backend"

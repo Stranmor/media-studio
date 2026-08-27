@@ -21,6 +21,10 @@ fail the publish job. The verifier also re-runs FFprobe positive-duration and
 full-decode checks for every downloaded media output, validates the expected
 Flatpak app IDs, and checks exact hardware encoder fields.
 
+Every release checkout uses the event commit SHA rather than a mutable tag
+ref, and each published binary, Flatpak bundle, and gate receipt carries a
+one-line source-SHA sidecar that the verifier matches to `github.sha`.
+
 The native gate also validates each x86_64 and aarch64 tarball against its
 binary checksum and inspects the matching Debian and RPM package metadata
 (name, version, and architecture) before publication. The public gate receipt is

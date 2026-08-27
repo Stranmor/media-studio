@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-assets_dir=${1:?usage: verify-gates.sh RELEASE_ASSETS RELEASE_GATES}
-gates_dir=${2:?usage: verify-gates.sh RELEASE_ASSETS RELEASE_GATES}
+assets_dir=${1:?usage: verify-gates.sh RELEASE_ASSETS RELEASE_GATES EXPECTED_COMMIT}
+gates_dir=${2:?usage: verify-gates.sh RELEASE_ASSETS RELEASE_GATES EXPECTED_COMMIT}
+expected_commit=${3:-${GITHUB_SHA:-}}
 
 [[ -d "$assets_dir" ]] || {
   printf 'release assets directory does not exist: %s\n' "$assets_dir" >&2
@@ -11,6 +12,29 @@ gates_dir=${2:?usage: verify-gates.sh RELEASE_ASSETS RELEASE_GATES}
 [[ -d "$gates_dir" ]] || {
   printf 'release gates directory does not exist: %s\n' "$gates_dir" >&2
   exit 2
+}
+[[ "$expected_commit" =~ ^[0-9a-fA-F]{40}$ ]] || {
+  printf 'an exact 40-character release commit is required for provenance checks\n' >&2
+  exit 2
+}
+
+verify_source_sha() {
+  local provenance="$1"
+  local label="$2"
+  local value extra
+  [[ -s "$provenance" ]] || {
+    printf '%s provenance receipt is missing: %s\n' "$label" "$provenance" >&2
+    exit 1
+  }
+  read -r value extra < "$provenance"
+  [[ "$value" == "$expected_commit" && -z "${extra:-}" ]] || {
+    printf '%s is not bound to release commit %s\n' "$label" "$expected_commit" >&2
+    exit 1
+  }
+  [[ "$(wc -l < "$provenance")" -eq 1 ]] || {
+    printf '%s provenance receipt must contain exactly one line\n' "$label" >&2
+    exit 1
+  }
 }
 
 [[ -s Cargo.toml ]] || {
@@ -137,6 +161,7 @@ verify_media_output() {
 for arch in x86_64 aarch64; do
   binary="media-studio-linux-$arch"
   test -s "$assets_dir/$binary"
+  verify_source_sha "$assets_dir/$binary.source-sha" "$binary source"
   test -s "$assets_dir/$binary.sha256"
   verify_checksum_manifest "$assets_dir/$binary.sha256" "$assets_dir/$binary" "$binary" "$binary checksum"
   verify_tarball "$assets_dir/$binary.tar.gz" "$binary"
@@ -160,6 +185,7 @@ done
 
 for bundle in media-studio-sandbox.flatpak media-studio-host-integration.flatpak; do
   test -s "$assets_dir/$bundle"
+  verify_source_sha "$assets_dir/$bundle.source-sha" "$bundle source"
 done
 
 for backend in vaapi nvenc; do
@@ -167,6 +193,7 @@ for backend in vaapi nvenc; do
   job_log="$gates_dir/hardware-$backend/job.log"
   output="$gates_dir/hardware-$backend/output.mp4"
   checksum="$gates_dir/hardware-$backend/output.sha256"
+  verify_source_sha "$gates_dir/hardware-$backend/source-sha.txt" "hardware-$backend source"
   test -s "$receipt"
   test -s "$job_log"
   test -s "$output"
@@ -201,6 +228,7 @@ for kind in sandbox host-integration; do
   job_log="$gates_dir/flatpak-$kind/job.log"
   output="$gates_dir/flatpak-$kind/output.mp4"
   checksum="$gates_dir/flatpak-$kind/output.sha256"
+  verify_source_sha "$gates_dir/flatpak-$kind/source-sha.txt" "Flatpak $kind source"
   test -s "$receipt"
   test -s "$job_log"
   test -s "$output"

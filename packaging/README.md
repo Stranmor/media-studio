@@ -68,4 +68,7 @@ Pass the one-time registration token through `--token-stdin` (the preferred
 route). Provisioning uses the `expect` PTY helper to feed it through a private
 file descriptor, never through `Runner.Listener` argv or a persistent
 environment variable; `RUNNER_REGISTRATION_TOKEN` remains only as a compatibility
-fallback and is cleared immediately after read.
+fallback and is cleared immediately after read. The PTY handshake records a
+redacted marker transcript, accepts the supported registration-token prompt
+variants, requires a zero child exit, and verifies regular `.runner` and
+`.credentials` state files before enabling the service.

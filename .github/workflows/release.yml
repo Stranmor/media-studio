@@ -23,6 +23,14 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - uses: actions/checkout@main
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Verify exact source checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
       - uses: dtolnay/rust-toolchain@stable
       - name: Verify Arch release source identity
         env:
@@ -46,6 +54,7 @@ jobs:
           cp "$rpm" release-assets/
           tar -czf "release-assets/${binary}.tar.gz" -C release-assets/stage "$binary"
           (cd release-assets/stage && sha256sum "${binary}") > "release-assets/${binary}.sha256"
+          printf '%s\n' "$GITHUB_SHA" > "release-assets/${binary}.source-sha"
           cp "release-assets/stage/${binary}" release-assets/
       - uses: actions/upload-artifact@main
         with:
@@ -58,8 +67,13 @@ jobs:
     steps:
       - uses: actions/checkout@main
         with:
-          ref: ${{ github.ref }}
+          ref: ${{ github.sha }}
           persist-credentials: false
+      - name: Verify exact source checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
       - uses: actions/download-artifact@main
         with:
           path: release-assets
@@ -114,14 +128,14 @@ jobs:
           ffprobe -version | head -n1
       - name: Verify every release gate receipt
         shell: bash
-        run: packaging/release/verify-gates.sh release-assets release-gates
+        run: packaging/release/verify-gates.sh release-assets release-gates "$GITHUB_SHA"
       - name: Record release gate receipt
         shell: bash
         run: |
           set -euo pipefail
           test -s release-gates/release-gates.txt
           cp release-gates/release-gates.txt release-assets/release-gates.txt
-          printf 'ref=%s\n' '${{ github.ref }}' >> release-assets/release-gates.txt
+          printf 'ref=%s\nsha=%s\n' '${{ github.ref }}' '${{ github.sha }}' >> release-assets/release-gates.txt
       - uses: softprops/action-gh-release@master
         with:
           files: |
@@ -135,20 +149,20 @@ jobs:
     needs: build
     uses: ./.github/workflows/flatpak.yml
     with:
-      checkout_ref: ${{ github.ref }}
+      checkout_ref: ${{ github.sha }}
       publish_bundle: true
     secrets: inherit
 
   native-ci:
     uses: ./.github/workflows/ci.yml
     with:
-      checkout_ref: ${{ github.ref }}
+      checkout_ref: ${{ github.sha }}
 
   hardware:
     needs: build
     uses: ./.github/workflows/gpu.yml
     with:
-      checkout_ref: ${{ github.ref }}
+      checkout_ref: ${{ github.sha }}
     secrets: inherit
 
   arch-package:
@@ -158,8 +172,13 @@ jobs:
     steps:
       - uses: actions/checkout@main
         with:
-          ref: ${{ github.ref }}
+          ref: ${{ github.sha }}
           persist-credentials: false
+      - name: Verify exact source checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
       - name: Verify Arch source identity
         env:
           EXPECTED_SHA: ${{ github.sha }}

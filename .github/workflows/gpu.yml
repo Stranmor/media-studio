@@ -21,8 +21,7 @@ jobs:
       ((github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'workflow_call' &&
       startsWith(github.ref, 'refs/tags/v') &&
-      startsWith(inputs.checkout_ref, 'refs/tags/v') &&
-      inputs.checkout_ref == github.ref))
+      inputs.checkout_ref == github.sha))
     runs-on: [self-hosted, linux, gpu, '${{ matrix.backend }}']
     environment: gpu-hardware
     timeout-minutes: 30
@@ -37,7 +36,12 @@ jobs:
     steps:
       - uses: actions/checkout@main
         with:
-          ref: ${{ inputs.checkout_ref || github.ref }}
+          ref: ${{ inputs.checkout_ref || github.sha }}
+      - name: Verify exact source checkout
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
       - name: Verify runner tools
         run: |
           set -eu
@@ -57,6 +61,7 @@ jobs:
           set -eu
           mkdir -p "$MEDIA_STUDIO_PROOF_DIR"
           packaging/gpu/hardware-smoke.sh '${{ matrix.backend }}' '${{ matrix.vaapi_device }}'
+          printf '%s\n' "$GITHUB_SHA" > "$MEDIA_STUDIO_PROOF_DIR/source-sha.txt"
       - name: Upload hardware receipt
         if: success()
         uses: actions/upload-artifact@main
