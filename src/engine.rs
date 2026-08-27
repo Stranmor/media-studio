@@ -584,10 +584,7 @@ fn verify(profile: &Profile, output: &Path, log: &mut File) -> Result<()> {
 
 fn parse_positive_duration(value: &str, message: &str) -> Result<f64> {
     let duration = value.parse::<f64>().context(message.to_owned())?;
-    anyhow::ensure!(
-        duration.is_finite() && duration > 0.0,
-        "{message}: {value}"
-    );
+    anyhow::ensure!(duration.is_finite() && duration > 0.0, "{message}: {value}");
     Ok(duration)
 }
 
