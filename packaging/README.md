@@ -95,7 +95,7 @@ payloads. Verify the online GitHub attestations and local checksums with:
 packaging/release/verify-attestations.sh \
   release-assets \
   Stranmor/media-studio \
-  refs/tags/v0.2.5 \
+  refs/tags/RELEASE_TAG \
   RELEASE_COMMIT_SHA
 ```
 

@@ -29,6 +29,7 @@ runtime_version="$(read_manifest_value 'data.fetch("runtime-version")')"
 source_url="$(read_manifest_value 'data.fetch("modules").fetch(0).fetch("sources").fetch(0).fetch("url")')"
 source_tag="$(read_manifest_value 'data.fetch("modules").fetch(0).fetch("sources").fetch(0).fetch("tag")')"
 source_commit="$(read_manifest_value 'data.fetch("modules").fetch(0).fetch("sources").fetch(0).fetch("commit")')"
+package_version="$(awk -F'"' '$1 == "version = " { print $2; exit }' "$root_dir/Cargo.toml")"
 
 [[ "$manifest_app_id" == "$app_id" ]] || {
   printf 'unexpected app id: %s\n' "$manifest_app_id" >&2
@@ -44,6 +45,10 @@ source_commit="$(read_manifest_value 'data.fetch("modules").fetch(0).fetch("sour
 }
 [[ "$source_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]] || {
   printf 'source tag is not an immutable release tag: %s\n' "$source_tag" >&2
+  exit 1
+}
+[[ "$source_tag" == "v$package_version" ]] || {
+  printf 'manifest source tag does not match Cargo package version: tag=%s version=%s\n' "$source_tag" "$package_version" >&2
   exit 1
 }
 [[ "$source_commit" =~ ^[0-9a-fA-F]{40}$ ]] || {

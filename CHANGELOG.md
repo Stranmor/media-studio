@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.2.6] - 2026-08-27
+
+### Fixed
+
+- Release checksum subject manifests now preserve NUL-delimited filenames in GitHub Actions.
+- Flathub preflight installs the declared Freedesktop SDK and runtime before the strict build.
+
+### Added
+
+- Signed release provenance and SPDX SBOM attestations are published with the immutable release assets.
+
 ## [0.2.5] - 2026-08-27
 
 ### Added

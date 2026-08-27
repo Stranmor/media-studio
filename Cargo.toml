@@ -1,6 +1,6 @@
 [package]
 name = "media-studio"
-version = "0.2.5"
+version = "0.2.6"
 edition = "2021"
 description = "Dolphin-integrated media conversion studio"
 authors = ["Ivan Plankin"]
