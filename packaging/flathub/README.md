@@ -27,13 +27,14 @@ packaging/flathub/verify-submission.sh
 ```
 
 The preflight checks the app ID, immutable source identity, strict permissions,
-metadata, icon dimensions, license, and generated source closure. The actual
+metadata, icon dimensions, license, and generated source closure. It reports a
+technical pass separately from the unresolved Flathub policy gate. The actual
 Flatpak build is exercised by `.github/workflows/flathub-preflight.yml`.
 
 ## Submission boundary
 
-This repository does not automate a Flathub pull request. A human maintainer
-must review the policy fit and create the submission through Flathub's normal
-review flow. The project is primarily a Dolphin/CLI integration tool, so the
-strict bundle is intentionally presented as a policy-review candidate rather
-than an assumed approval.
+This repository does not automate a Flathub pull request. Current Flathub rules
+prohibit AI-generated submission content and normally reject console or
+host-dependent utilities. A human maintainer must independently resolve that
+policy boundary, including any exception request, before using the technical
+bundle in Flathub's normal review flow.

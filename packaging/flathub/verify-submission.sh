@@ -104,5 +104,6 @@ if [[ "${MEDIA_STUDIO_SKIP_REMOTE_SOURCE_CHECK:-0}" != 1 ]]; then
   }
 fi
 
-printf 'FLATHUB_PREFLIGHT=passed app_id=%s runtime=%s source_tag=%s source_commit=%s\n' \
+printf 'FLATHUB_TECHNICAL_PREFLIGHT=passed app_id=%s runtime=%s source_tag=%s source_commit=%s\n' \
   "$manifest_app_id" "$runtime_version" "$source_tag" "$source_commit"
+printf 'FLATHUB_POLICY_GATE=human_exception_review_required\n'
