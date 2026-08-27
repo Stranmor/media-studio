@@ -51,7 +51,9 @@ verifies the committed MP4 with FFprobe and full decode, and requires an exact
 `HARDWARE_USED=<BACKEND> ENCODER=<ENCODER>` marker, no
 `HARDWARE_FALLBACK`, and `RESULT=verified`. Each successful matrix leg uploads
 `receipt.txt`, `job.log`, the output checksum, and the proof directory as an
-Actions artifact.
+Actions artifact. The smoke process exports `MEDIA_STUDIO_HEADLESS=1`, clears
+`DISPLAY`/`WAYLAND_DISPLAY`, and is bounded to five minutes so GUI helpers
+cannot block a trusted runner indefinitely.
 
 The matrix is intentionally separate from normal CI. If no trusted runner is
 online, the GPU gate is waiting/unverified and the release cannot publish.

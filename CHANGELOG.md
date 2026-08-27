@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.7] - 2026-08-27
+
+### Fixed
+
+- Headless hardware smoke no longer blocks on desktop notification helpers.
+- GPU conversion checks now fail within five minutes instead of waiting for the
+  workflow-level timeout.
+
 ## [0.2.6] - 2026-08-27
 
 ### Fixed

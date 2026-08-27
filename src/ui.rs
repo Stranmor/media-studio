@@ -12,7 +12,30 @@ pub struct AdvancedSelection {
     pub hardware_fallback: bool,
 }
 
+fn notifications_enabled_for(headless: bool, display: bool, wayland: bool) -> bool {
+    !headless && (display || wayland)
+}
+
+fn notifications_enabled() -> bool {
+    let headless = std::env::var("MEDIA_STUDIO_HEADLESS")
+        .map(|value| {
+            matches!(
+                value.trim().to_ascii_lowercase().as_str(),
+                "1" | "true" | "yes" | "on"
+            )
+        })
+        .unwrap_or(false);
+    notifications_enabled_for(
+        headless,
+        std::env::var_os("DISPLAY").is_some(),
+        std::env::var_os("WAYLAND_DISPLAY").is_some(),
+    )
+}
+
 pub fn notify(title: &str, body: &str) {
+    if !notifications_enabled() {
+        return;
+    }
     if let Some(notify_send) = runtime::optional("notify-send") {
         let notify_status = Command::new(notify_send)
             .arg("--app-name=Media Studio")
@@ -204,6 +227,9 @@ fn kdialog_yesno(prompt: &str) -> Result<bool> {
 }
 
 pub fn show_info(title: &str, body: &str) {
+    if !notifications_enabled() {
+        return;
+    }
     if let Some(zenity) = runtime::optional_usable("zenity") {
         let _ = Command::new(zenity)
             .args(["--info", "--title", title, "--text", body, "--width", "760"])
@@ -212,5 +238,28 @@ pub fn show_info(title: &str, body: &str) {
         let _ = Command::new(kdialog)
             .args(["--title", title, "--msgbox", body])
             .status();
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::notifications_enabled_for;
+
+    #[test]
+    fn headless_mode_always_disables_notifications() {
+        assert!(!notifications_enabled_for(true, true, true));
+        assert!(!notifications_enabled_for(true, true, false));
+        assert!(!notifications_enabled_for(true, false, true));
+    }
+
+    #[test]
+    fn graphical_session_enables_notifications() {
+        assert!(notifications_enabled_for(false, true, false));
+        assert!(notifications_enabled_for(false, false, true));
+    }
+
+    #[test]
+    fn missing_graphical_session_disables_notifications() {
+        assert!(!notifications_enabled_for(false, false, false));
     }
 }

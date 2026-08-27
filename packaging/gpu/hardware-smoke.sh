@@ -30,6 +30,7 @@ for required_encoder in libx264 "$encoder"; do
 done
 command -v systemd-run >/dev/null
 command -v sha256sum >/dev/null
+command -v timeout >/dev/null
 
 cargo build --release
 
@@ -61,13 +62,17 @@ mkdir -p "$proof_dir/input" "$proof_dir/output" "$proof_dir/home" "$proof_dir/st
 export HOME="$proof_dir/home"
 export XDG_CONFIG_HOME="$HOME/.config"
 export XDG_STATE_HOME="$proof_dir/state"
+# Hardware smoke is deliberately non-interactive. Suppress desktop helpers so
+# a self-hosted runner cannot block on notify-send, Zenity, or KDialog.
+export MEDIA_STUDIO_HEADLESS=1
+unset DISPLAY WAYLAND_DISPLAY
 
 ffmpeg -hide_banner -loglevel error \
   -f lavfi -i testsrc2=size=640x360:rate=24:duration=2 \
   -f lavfi -i sine=frequency=1000:sample_rate=48000:duration=2 \
   -shortest -c:v libx264 -c:a aac "$proof_dir/input/fixture.mkv"
 
-target/release/media-studio run \
+timeout --signal=TERM --kill-after=15s 300s target/release/media-studio run \
   --job-id "gpu-${backend}" \
   --profile "$profile" \
   --hardware-fallback=false \
