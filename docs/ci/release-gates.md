@@ -10,11 +10,15 @@ The tag release workflow publishes only after all three independent gates pass:
    hardware fallback disabled and durable receipts.
 
 The Flatpak and GPU workflows are reusable so the exact same jobs run on normal
-`main` pushes and from a release tag. Successful release builds publish both
-Flatpak bundles alongside the native assets; the host-integration bundle stays
-clearly labeled as experimental.
+`main` pushes and from a release tag. Release calls pass an explicit
+`release_gate=true` input and the called workflows validate the exact SHA; this
+avoids treating the caller's `push` event as a standalone main-branch run.
+Successful release builds publish both Flatpak bundles alongside the native
+assets; the host-integration bundle stays clearly labeled as experimental.
 
-The release publish job downloads every gate receipt and runs
+The release publish job always starts its status check and fails closed when
+any required dependency is failed or skipped, then downloads every gate receipt
+and runs
 `packaging/release/verify-gates.sh` before creating the GitHub release. Missing
 native checksums, Flatpak receipts, hardware markers, or verified-result logs
 fail the publish job. The verifier also re-runs FFprobe positive-duration and

@@ -63,8 +63,32 @@ jobs:
 
   publish:
     needs: [build, arch-package, native-ci, flatpak, hardware]
+    if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
+      - name: Require every release gate to succeed
+        shell: bash
+        env:
+          BUILD_RESULT: ${{ needs.build.result }}
+          ARCH_RESULT: ${{ needs.arch-package.result }}
+          NATIVE_RESULT: ${{ needs.native-ci.result }}
+          FLATPAK_RESULT: ${{ needs.flatpak.result }}
+          HARDWARE_RESULT: ${{ needs.hardware.result }}
+        run: |
+          set -euo pipefail
+          for gate in \
+            "build=$BUILD_RESULT" \
+            "arch-package=$ARCH_RESULT" \
+            "native-ci=$NATIVE_RESULT" \
+            "flatpak=$FLATPAK_RESULT" \
+            "hardware=$HARDWARE_RESULT"; do
+            gate_name="${gate%%=*}"
+            gate_result="${gate#*=}"
+            if [ "$gate_result" != success ]; then
+              printf 'release gate %s did not succeed: %s\n' "$gate_name" "$gate_result" >&2
+              exit 1
+            fi
+          done
       - uses: actions/checkout@main
         with:
           ref: ${{ github.sha }}
@@ -152,6 +176,7 @@ jobs:
     with:
       checkout_ref: ${{ github.sha }}
       publish_bundle: true
+      release_gate: true
     secrets: inherit
 
   native-ci:
@@ -164,6 +189,7 @@ jobs:
     uses: ./.github/workflows/gpu.yml
     with:
       checkout_ref: ${{ github.sha }}
+      release_gate: true
     secrets: inherit
 
   arch-package:

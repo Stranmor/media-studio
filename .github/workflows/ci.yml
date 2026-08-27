@@ -137,12 +137,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          expected_version="$(awk -F'"' '$1 == "version = " { print $2; exit }' Cargo.toml)"
+          test -n "$expected_version"
           bash -n packaging/arch/PKGBUILD
           if command -v makepkg >/dev/null 2>&1; then
-            (cd packaging/arch && makepkg --packagelist | grep -F 'media-studio-0.2.2-1-')
+            (cd packaging/arch && makepkg --packagelist | grep -F "media-studio-${expected_version}-1-")
           else
             grep -F 'pkgname=media-studio' packaging/arch/PKGBUILD
-            grep -F 'pkgver=0.2.2' packaging/arch/PKGBUILD
+            grep -F "pkgver=${expected_version}" packaging/arch/PKGBUILD
           fi
           grep -F 'source=("git+$source_repo#tag=$source_tag")' packaging/arch/PKGBUILD
           test -x packaging/arch/verify-source.sh

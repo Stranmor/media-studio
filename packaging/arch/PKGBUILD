@@ -1,5 +1,5 @@
 pkgname=media-studio
-pkgver=0.2.2
+pkgver=0.2.3
 pkgrel=1
 pkgdesc='Dolphin-integrated local media conversion studio'
 arch=('x86_64' 'aarch64')
