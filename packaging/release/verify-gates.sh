@@ -158,6 +158,33 @@ verify_media_output() {
   ffmpeg -hide_banner -nostdin -loglevel error -xerror -i "$output" -map 0:v? -map 0:a? -f null -
 }
 
+verify_receipt_duration() {
+  local receipt="$1"
+  local output="$2"
+  local label="$3"
+  local field_count receipt_duration output_duration
+  field_count="$(grep -Ec '^duration_seconds=' "$receipt" || true)"
+  [[ "$field_count" -eq 1 ]] || {
+    printf '%s must contain exactly one duration_seconds field\n' "$label" >&2
+    exit 1
+  }
+  receipt_duration="$(sed -n 's/^duration_seconds=//p' "$receipt")"
+  output_duration="$(ffprobe -v error -show_entries format=duration \
+    -of default=noprint_wrappers=1:nokey=1 "$output")"
+  awk -v receipt="$receipt_duration" -v output="$output_duration" '
+    BEGIN {
+      valid = receipt ~ /^[0-9]+([.][0-9]+)?$/ && output ~ /^[0-9]+([.][0-9]+)?$/
+      positive = receipt > 0 && output > 0
+      close = (receipt - output < 0 ? output - receipt : receipt - output) <= 0.01
+      exit !(valid && positive && close)
+    }
+  ' || {
+    printf '%s duration_seconds does not match FFprobe output: receipt=%s output=%s\n' \
+      "$label" "$receipt_duration" "$output_duration" >&2
+    exit 1
+  }
+}
+
 for arch in x86_64 aarch64; do
   binary="media-studio-linux-$arch"
   test -s "$assets_dir/$binary"
@@ -200,6 +227,7 @@ for backend in vaapi nvenc; do
   test -s "$checksum"
   verify_checksum_manifest "$checksum" "$output" output.mp4 "hardware-$backend checksum"
   verify_media_output "$output" "hardware-$backend output"
+  verify_receipt_duration "$receipt" "$output" "hardware-$backend receipt"
   grep -Fx 'result=verified' "$receipt"
   grep -Fx "backend=$backend" "$receipt"
   grep -Fx "encoder=h264_$backend" "$receipt"
@@ -235,6 +263,7 @@ for kind in sandbox host-integration; do
   test -s "$checksum"
   verify_checksum_manifest "$checksum" "$output" output.mp4 "Flatpak $kind checksum"
   verify_media_output "$output" "Flatpak $kind output"
+  verify_receipt_duration "$receipt" "$output" "Flatpak $kind receipt"
   if [ "$kind" = sandbox ]; then
     expected_app_id='io.github.stranmor.MediaStudio'
   else

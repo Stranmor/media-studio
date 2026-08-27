@@ -143,6 +143,7 @@ jobs:
             release-assets/*.deb
             release-assets/*.rpm
             release-assets/*.flatpak
+            release-assets/*.flatpak.source-sha
             release-assets/release-gates.txt
 
   flatpak:
