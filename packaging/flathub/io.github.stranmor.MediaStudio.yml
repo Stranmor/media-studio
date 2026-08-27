@@ -42,8 +42,8 @@ modules:
     sources:
       - type: git
         url: https://github.com/Stranmor/media-studio.git
-        tag: v0.2.5
-        commit: d314bd4aa4da74b6047c67a283606950c3421542
+        tag: v0.2.6
+        commit: 92527e1fc28ae309abd2882e86b161c02894112f
       - cargo-sources.json
     build-commands:
       - cargo --offline fetch --manifest-path Cargo.toml --locked --verbose
