@@ -50,6 +50,11 @@ actual command (including Flatpak host wrappers), keeps installation successful
 when a helper is absent or fails, and reports the cache/dialog capability as
 unavailable instead of treating a wrapper path as proof of host availability.
 
+`packaging/flathub/` is a separate strict submission bundle. It pins the
+standalone source to a release tag and commit, carries the generated Cargo
+closure required for offline builds, and is checked by
+`packaging/flathub/verify-submission.sh` plus the Flathub preflight workflow.
+
 `provision-runner.sh --replace` acquires a per-runner provisioning lock and
 refuses to mutate a runner directory while its user service or Runner.Listener
 process is active. Stop the service first, then rerun the explicit replacement.
