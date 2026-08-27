@@ -175,8 +175,8 @@ verify_receipt_duration() {
     BEGIN {
       valid = receipt ~ /^[0-9]+([.][0-9]+)?$/ && output ~ /^[0-9]+([.][0-9]+)?$/
       positive = receipt > 0 && output > 0
-      close = (receipt - output < 0 ? output - receipt : receipt - output) <= 0.01
-      exit !(valid && positive && close)
+      within_tolerance = (receipt - output < 0 ? output - receipt : receipt - output) <= 0.01
+      exit !(valid && positive && within_tolerance)
     }
   ' || {
     printf '%s duration_seconds does not match FFprobe output: receipt=%s output=%s\n' \
