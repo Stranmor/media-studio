@@ -11,8 +11,8 @@ permission. Dolphin service menus, watch-folders, host dialogs, and host tool
 delegation remain in the native package and the explicitly experimental
 `HostIntegration` manifest.
 
-The manifest is pinned to release tag `v0.2.6` and commit
-`92527e1fc28ae309abd2882e86b161c02894112f`. The commit is deliberately the
+The manifest is pinned to release tag `v0.2.7` and commit
+`948fd5f585aa2b6ccf8cd62eb360c88fa24feebb`. The commit is deliberately the
 upstream release commit, while this submission metadata can evolve separately.
 
 ## Reproducible offline build
