@@ -3,17 +3,57 @@ name: Release
 on:
   push:
     tags: ["v*"]
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: Immutable version tag to build and publish
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: media-studio-release-${{ github.ref }}
+  group: media-studio-release-${{ inputs.release_tag || github.ref }}
   cancel-in-progress: false
 
 jobs:
+  source:
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.resolve.outputs.release_tag }}
+      release_ref: ${{ steps.resolve.outputs.release_ref }}
+      release_sha: ${{ steps.resolve.outputs.release_sha }}
+    steps:
+      - uses: actions/checkout@main
+        with:
+          ref: ${{ github.ref }}
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Resolve immutable release source
+        id: resolve
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          EVENT_REF_NAME: ${{ github.ref_name }}
+          INPUT_RELEASE_TAG: ${{ inputs.release_tag }}
+        run: |
+          set -euo pipefail
+          if [[ "$EVENT_NAME" == workflow_dispatch ]]; then
+            release_tag="$INPUT_RELEASE_TAG"
+          else
+            release_tag="$EVENT_REF_NAME"
+          fi
+          [[ "$release_tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$ ]]
+          git fetch --force --tags origin "refs/tags/${release_tag}:refs/tags/${release_tag}"
+          release_sha="$(git rev-parse "${release_tag}^{commit}")"
+          release_ref="refs/tags/${release_tag}"
+          printf 'release_tag=%s\n' "$release_tag" >> "$GITHUB_OUTPUT"
+          printf 'release_ref=%s\n' "$release_ref" >> "$GITHUB_OUTPUT"
+          printf 'release_sha=%s\n' "$release_sha" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: source
     strategy:
       matrix:
         include:
@@ -25,21 +65,26 @@ jobs:
     steps:
       - uses: actions/checkout@main
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ needs.source.outputs.release_sha }}
           persist-credentials: false
       - name: Verify exact source checkout
         shell: bash
+        env:
+          RELEASE_SHA: ${{ needs.source.outputs.release_sha }}
         run: |
           set -euo pipefail
-          test "$(git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD)" = "$RELEASE_SHA"
       - uses: dtolnay/rust-toolchain@stable
       - name: Verify Arch release source identity
         env:
-          EXPECTED_SHA: ${{ github.sha }}
-        run: packaging/arch/verify-source.sh --repo https://github.com/Stranmor/media-studio.git --tag "${GITHUB_REF_NAME}" --expected-commit "$EXPECTED_SHA"
+          EXPECTED_SHA: ${{ needs.source.outputs.release_sha }}
+          RELEASE_TAG: ${{ needs.source.outputs.release_tag }}
+        run: packaging/arch/verify-source.sh --repo https://github.com/Stranmor/media-studio.git --tag "$RELEASE_TAG" --expected-commit "$EXPECTED_SHA"
       - run: cargo build --release
       - name: Build binary and distro packages
         shell: bash
+        env:
+          RELEASE_SHA: ${{ needs.source.outputs.release_sha }}
         run: |
           set -euo pipefail
           cargo install cargo-deb cargo-generate-rpm
@@ -55,7 +100,7 @@ jobs:
           cp "$rpm" release-assets/
           tar -czf "release-assets/${binary}.tar.gz" -C release-assets/stage "$binary"
           (cd release-assets/stage && sha256sum "${binary}") > "release-assets/${binary}.sha256"
-          printf '%s\n' "$GITHUB_SHA" > "release-assets/${binary}.source-sha"
+          printf '%s\n' "$RELEASE_SHA" > "release-assets/${binary}.source-sha"
           cp "release-assets/stage/${binary}" release-assets/
       - uses: actions/upload-artifact@main
         with:
@@ -63,7 +108,7 @@ jobs:
           path: release-assets/*
 
   publish:
-    needs: [build, arch-package, native-ci, flatpak, hardware]
+    needs: [source, build, arch-package, native-ci, flatpak, hardware]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     permissions:
@@ -98,13 +143,15 @@ jobs:
           done
       - uses: actions/checkout@main
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ needs.source.outputs.release_sha }}
           persist-credentials: false
       - name: Verify exact source checkout
         shell: bash
+        env:
+          RELEASE_SHA: ${{ needs.source.outputs.release_sha }}
         run: |
           set -euo pipefail
-          test "$(git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD)" = "$RELEASE_SHA"
       - uses: actions/download-artifact@main
         with:
           path: release-assets
@@ -159,14 +206,16 @@ jobs:
           ffprobe -version | head -n1
       - name: Verify every release gate receipt
         shell: bash
-        run: packaging/release/verify-gates.sh release-assets release-gates "$GITHUB_SHA"
+        env:
+          RELEASE_SHA: ${{ needs.source.outputs.release_sha }}
+        run: packaging/release/verify-gates.sh release-assets release-gates "$RELEASE_SHA"
       - name: Record release gate receipt
         shell: bash
         run: |
           set -euo pipefail
           test -s release-gates/release-gates.txt
           cp release-gates/release-gates.txt release-assets/release-gates.txt
-          printf 'ref=%s\nsha=%s\n' '${{ github.ref }}' '${{ github.sha }}' >> release-assets/release-gates.txt
+          printf 'ref=%s\nsha=%s\n' '${{ needs.source.outputs.release_ref }}' '${{ needs.source.outputs.release_sha }}' >> release-assets/release-gates.txt
       - name: Prepare SPDX output directory
         shell: bash
         run: mkdir -p sbom
@@ -176,7 +225,7 @@ jobs:
           path: release-assets
           format: spdx-json
           output-file: sbom/media-studio.spdx.json
-          artifact-name: media-studio-${{ github.ref_name }}.spdx.json
+          artifact-name: media-studio-${{ needs.source.outputs.release_tag }}.spdx.json
           upload-artifact: false
           upload-release-assets: false
       - name: Prepare attestation subject manifests
@@ -235,6 +284,7 @@ jobs:
           install -Dm644 "$BUNDLE_PATH" release-assets/media-studio.sbom.attestation.json
       - uses: softprops/action-gh-release@master
         with:
+          tag_name: ${{ needs.source.outputs.release_tag }}
           files: |
             # Keep every pattern disjoint: overlapping globs make the release
             # action upload the same checksum twice and can trigger a race.
@@ -260,45 +310,49 @@ jobs:
             release-assets/release-gates.txt
 
   flatpak:
-    needs: build
+    needs: [source, build]
     uses: ./.github/workflows/flatpak.yml
     with:
-      checkout_ref: ${{ github.sha }}
+      checkout_ref: ${{ needs.source.outputs.release_sha }}
       publish_bundle: true
       release_gate: true
     secrets: inherit
 
   native-ci:
+    needs: source
     uses: ./.github/workflows/ci.yml
     with:
-      checkout_ref: ${{ github.sha }}
+      checkout_ref: ${{ needs.source.outputs.release_sha }}
 
   hardware:
-    needs: build
+    needs: [source, build]
     uses: ./.github/workflows/gpu.yml
     with:
-      checkout_ref: ${{ github.sha }}
+      checkout_ref: ${{ needs.source.outputs.release_sha }}
       release_gate: true
     secrets: inherit
 
   arch-package:
-    needs: build
+    needs: [source, build]
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@main
         with:
-          ref: ${{ github.sha }}
+          ref: ${{ needs.source.outputs.release_sha }}
           persist-credentials: false
       - name: Verify exact source checkout
         shell: bash
+        env:
+          RELEASE_SHA: ${{ needs.source.outputs.release_sha }}
         run: |
           set -euo pipefail
-          test "$(git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD)" = "$GITHUB_SHA"
+          test "$(git -c safe.directory="$GITHUB_WORKSPACE" rev-parse HEAD)" = "$RELEASE_SHA"
       - name: Verify Arch source identity
         env:
-          EXPECTED_SHA: ${{ github.sha }}
-        run: packaging/arch/verify-source.sh --repo https://github.com/Stranmor/media-studio.git --tag "${GITHUB_REF_NAME}" --expected-commit "$EXPECTED_SHA"
+          EXPECTED_SHA: ${{ needs.source.outputs.release_sha }}
+          RELEASE_TAG: ${{ needs.source.outputs.release_tag }}
+        run: packaging/arch/verify-source.sh --repo https://github.com/Stranmor/media-studio.git --tag "$RELEASE_TAG" --expected-commit "$EXPECTED_SHA"
       - name: Build Arch package in the current Arch image
         shell: bash
         run: |
