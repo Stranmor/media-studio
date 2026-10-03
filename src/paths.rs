@@ -185,3 +185,28 @@ pub fn atomic_write(path: &Path, bytes: &[u8]) -> Result<()> {
     fs::rename(&temp, path).with_context(|| format!("не удалось заменить {}", path.display()))?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::model::Config;
+
+    #[test]
+    fn file_url_is_decoded() {
+        assert_eq!(
+            normalize_path_arg("file:///tmp/with%20space.mkv"),
+            PathBuf::from("/tmp/with space.mkv")
+        );
+    }
+
+    #[test]
+    fn output_path_does_not_equal_input() {
+        let profile = Config::built_in()
+            .profiles
+            .get("video_mp4")
+            .cloned()
+            .expect("profile");
+        let input = PathBuf::from("/tmp/example.mp4");
+        assert_ne!(output_path(&input, &profile, None, false), input);
+    }
+}
