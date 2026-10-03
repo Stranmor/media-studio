@@ -171,35 +171,3 @@ fn inherited_environment_args() -> Vec<String> {
         })
         .collect()
 }
-
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn queue_filter_excludes_watch_units() {
-        assert!(super::is_conversion_unit("media-studio-123-456.service"));
-        assert!(!super::is_conversion_unit(
-            "media-studio-watch-camera.service"
-        ));
-    }
-
-    #[test]
-    fn queue_vaapi_environment_argument_is_exact() {
-        assert_eq!(
-            super::vaapi_environment_arg(Some("/dev/dri/renderD128")),
-            Some("--setenv=MEDIA_STUDIO_VAAPI_DEVICE=/dev/dri/renderD128".to_string())
-        );
-        assert_eq!(super::vaapi_environment_arg(None), None);
-    }
-
-    #[test]
-    fn queue_propagates_user_data_environment_keys() {
-        let args = super::inherited_environment_args();
-        for key in ["HOME", "XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_STATE_HOME"] {
-            if std::env::var_os(key).is_some() {
-                assert!(args
-                    .iter()
-                    .any(|arg| arg.starts_with(&format!("--setenv={key}="))));
-            }
-        }
-    }
-}

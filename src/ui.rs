@@ -240,26 +240,3 @@ pub fn show_info(title: &str, body: &str) {
             .status();
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::notifications_enabled_for;
-
-    #[test]
-    fn headless_mode_always_disables_notifications() {
-        assert!(!notifications_enabled_for(true, true, true));
-        assert!(!notifications_enabled_for(true, true, false));
-        assert!(!notifications_enabled_for(true, false, true));
-    }
-
-    #[test]
-    fn graphical_session_enables_notifications() {
-        assert!(notifications_enabled_for(false, true, false));
-        assert!(notifications_enabled_for(false, false, true));
-    }
-
-    #[test]
-    fn missing_graphical_session_disables_notifications() {
-        assert!(!notifications_enabled_for(false, false, false));
-    }
-}

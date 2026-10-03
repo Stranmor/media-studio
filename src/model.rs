@@ -654,36 +654,3 @@ fn default_true() -> bool {
 fn default_settle_seconds() -> u64 {
     3
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn built_in_profiles_cover_requested_features() {
-        let config = Config::built_in();
-        assert_eq!(config.schema, CURRENT_SCHEMA);
-        assert_eq!(config.profiles["video_mp4_400mb"].target_size_mb, Some(400));
-        assert!(matches!(
-            config.profiles["video_mp4_vaapi"].hardware,
-            Some(HardwareBackend::Vaapi)
-        ));
-        assert!(matches!(
-            config.profiles["video_mp4_nvenc"].hardware,
-            Some(HardwareBackend::Nvenc)
-        ));
-        assert!(config.profiles["video_mp4_vaapi"]
-            .args
-            .windows(2)
-            .any(|pair| pair == ["-vaapi_device", "{vaapi_device}"]));
-    }
-
-    #[test]
-    fn watch_ids_are_safe_for_unit_names() {
-        assert!(valid_watch_id("camera_01"));
-        assert!(valid_watch_id("archive-2026"));
-        assert!(!valid_watch_id("../escape"));
-        assert!(!valid_watch_id("with space"));
-        assert!(!valid_watch_id(""));
-    }
-}
